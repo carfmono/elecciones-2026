@@ -23,6 +23,15 @@ st.set_page_config(
 # Fixed tab bar just below the Streamlit toolbar
 st.markdown("""
 <style>
+/* ─── Ocultar chrome de Streamlit ───────────────────────────── */
+#MainMenu {visibility: hidden;}
+footer {visibility: hidden;}
+header {visibility: hidden;}
+[data-testid="stToolbar"] {visibility: hidden;}
+.viewerBadge_container__1QSob {display: none;}
+.styles_viewerBadge__1yB5_ {display: none;}
+[data-testid="stDecoration"] {display: none;}
+
 /* ─── Fixed title bar ───────────────────────────────────────── */
 #page-title-bar {
     position: fixed;
