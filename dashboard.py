@@ -1,0 +1,1629 @@
+"""
+Dashboard interactivo – Elecciones Colombia 2026
+Ejecutar: .venv/bin/streamlit run dashboard.py
+"""
+
+import json
+import unicodedata
+import numpy as np
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+import streamlit as st
+from pathlib import Path
+
+# ── Config ────────────────────────────────────────────────────────────────────
+st.set_page_config(
+    page_title="Análisis Electoral – Primera Vuelta Colombia 2026",
+    page_icon=None,
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
+
+# Fixed tab bar just below the Streamlit toolbar
+st.markdown("""
+<style>
+/* ─── Fixed title bar ───────────────────────────────────────── */
+#page-title-bar {
+    position: fixed;
+    top: 3.25rem;
+    left: 0;
+    right: 0;
+    z-index: 999992;
+    background-color: var(--background-color, white) !important;
+    backdrop-filter: none !important;
+    text-align: center;
+    padding: 5px 16px;
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--text-color);
+    letter-spacing: 0.02em;
+    border-bottom: 1px solid rgba(128, 128, 128, 0.25);
+    line-height: 1.3;
+}
+
+/* ─── Fixed tab buttons row (below title bar) ───────────────── */
+div[data-testid="stTabs"] div[role="tablist"] {
+    position: fixed !important;
+    top: 5.7rem !important;
+    left: 0 !important;
+    right: 0 !important;
+    z-index: 999990 !important;
+    background-color: var(--background-color, white) !important;
+    backdrop-filter: none !important;
+    padding: 4px 16px !important;
+    border-bottom: 1px solid rgba(128, 128, 128, 0.2) !important;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15) !important;
+    overflow-x: auto !important;
+    white-space: nowrap !important;
+}
+
+/* ─── Push ALL tab content below the two fixed bars ─────────── */
+div[data-testid="stTabsContent"] {
+    padding-top: 175px !important;
+    margin-top: 0 !important;
+}
+
+/* ─── Section titles: solid opaque background ──────────────── */
+div[data-testid="stTabsContent"] h1,
+div[data-testid="stTabsContent"] h2,
+div[data-testid="stTabsContent"] h3 {
+    position: relative;
+    z-index: 1;
+    background-color: var(--background-color, white) !important;
+    padding-top: 8px !important;
+    padding-bottom: 4px !important;
+    margin-top: 0 !important;
+}
+
+/* ─── Mobile ─────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+    #page-title-bar {
+        top: 2.6rem;
+        font-size: 0.95rem;
+        padding: 4px 8px;
+    }
+    div[data-testid="stTabs"] div[role="tablist"] {
+        top: 5.1rem !important;
+        padding: 3px 6px !important;
+    }
+    div[data-testid="stTabsContent"] {
+        padding-top: 195px !important;
+    }
+    [data-testid="column"] {
+        min-width: 260px !important;
+    }
+    .stPlotlyChart {
+        width: 100% !important;
+    }
+}
+</style>
+<div id="page-title-bar">Análisis Electoral &ndash; Primera Vuelta Colombia 2026</div>
+""", unsafe_allow_html=True)
+
+# ── Constantes ────────────────────────────────────────────────────────────────
+TOP_CANDS = [
+    "ABELARDO DE LA ESPRIELLA",
+    "IVÁN CEPEDA CASTRO",
+    "PALOMA VALENCIA LASERNA",
+    "SERGIO FAJARDO VALDERRAMA",
+]
+
+COLORS = {
+    "ABELARDO DE LA ESPRIELLA":          "#1f77b4",
+    "IVÁN CEPEDA CASTRO":                "#CC0000",
+    "PALOMA VALENCIA LASERNA":           "#2ca02c",
+    "SERGIO FAJARDO VALDERRAMA":         "#ff7f0e",
+    "CLAUDIA LÓPEZ":                     "#9467bd",
+    "RAÚL SANTIAGO BOTERO JARAMILLO":    "#8c564b",
+    "ÓSCAR MAURICIO LIZCANO ARANGO":     "#e377c2",
+    "MIGUEL URIBE LONDOÑO":              "#7f7f7f",
+    "SONDRA MACOLLINS GARVIN PINTO":     "#bcbd22",
+    "ROY LEONARDO BARRERAS MONTEALEGRE": "#17becf",
+    "LUIS GILBERTO MURILLO URRUTIA":     "#aec7e8",
+    "CARLOS EDUARDO CAICEDO OMAR":       "#ffbb78",
+    "GUSTAVO MATAMOROS CAMACHO":         "#98df8a",
+    "OTROS":                             "#aaaaaa",
+}
+
+# Colores para la columna `ganador` (valores cortos del CSV)
+GANADOR_COLORS = {
+    "ABELARDO": "#1f77b4",
+    "CEPEDA":   "#CC0000",
+}
+
+# Registraduría dept_co (int) → DIVIPOLA 2-char code
+REG_TO_DIVIPOLA = {
+    1: "05", 3: "08", 5: "13", 7: "15", 9: "17",
+    11: "19", 12: "20", 13: "23", 15: "25", 16: "11",
+    17: "27", 19: "41", 21: "47", 23: "52", 24: "66",
+    25: "54", 26: "63", 27: "68", 28: "70", 29: "73",
+    31: "76", 40: "81", 44: "18", 46: "85", 48: "44",
+    50: "94", 52: "50", 54: "95", 56: "88", 60: "91",
+    64: "86", 68: "97", 72: "99",
+}
+
+# dept_nombre (nuestros datos) → DIVIPOLA 2-char code
+DEPT_TO_DIVIPOLA = {
+    "ANTIOQUIA": "05", "ATLANTICO": "08", "BOLIVAR": "13",
+    "BOYACA": "15", "CALDAS": "17", "CAQUETA": "18",
+    "CAUCA": "19", "CESAR": "20", "CORDOBA": "23",
+    "CUNDINAMARCA": "25", "BOGOTA D.C.": "11", "CHOCO": "27",
+    "HUILA": "41", "LA GUAJIRA": "44", "MAGDALENA": "47",
+    "META": "50", "NARIÑO": "52", "NORTE DE SAN": "54",
+    "QUINDIO": "63", "RISARALDA": "66", "SANTANDER": "68",
+    "SUCRE": "70", "TOLIMA": "73", "VALLE": "76",
+    "ARAUCA": "81", "CASANARE": "85", "PUTUMAYO": "86",
+    "SAN ANDRES": "88", "AMAZONAS": "91", "GUAINIA": "94",
+    "GUAVIARE": "95", "VAUPES": "97", "VICHADA": "99",
+}
+
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+def _norm(s: str) -> str:
+    s = unicodedata.normalize("NFKD", str(s))
+    return "".join(c for c in s if not unicodedata.combining(c)).upper().strip()
+
+
+def build_geo_lookup(geo_munis: dict) -> dict:
+    """(DIVIPOLA_dept, normalized_muni_name) → MPIO_CCNCT
+    Stores multiple alternative keys per municipality to maximise match rate.
+    """
+    lookup: dict = {}
+    ARTICLES = ("EL ", "LA ", "LOS ", "LAS ", "SAN ", "SANTA ", "SANTO ")
+
+    def _add(dpto: str, raw: str, code: str) -> None:
+        lookup.setdefault((dpto, raw), code)
+        # Without leading article
+        for art in ARTICLES:
+            if raw.startswith(art):
+                lookup.setdefault((dpto, raw[len(art):]), code)
+                break
+        # Without parenthetical / district suffixes
+        stripped = raw.split(" (")[0].split(",")[0].strip()
+        if stripped != raw:
+            lookup.setdefault((dpto, stripped), code)
+            for art in ARTICLES:
+                if stripped.startswith(art):
+                    lookup.setdefault((dpto, stripped[len(art):]), code)
+                    break
+
+    for feat in geo_munis["features"]:
+        p = feat["properties"]
+        code = p["MPIO_CCNCT"]
+        dpto = p["DPTO_CCDGO"]
+        _add(dpto, _norm(p["MPIO_CNMBR"]), code)
+
+    return lookup
+
+
+def group_otros(df: pd.DataFrame, col: str = "candidato_presidente") -> pd.DataFrame:
+    df = df.copy()
+    df[col] = df[col].where(df[col].isin(TOP_CANDS), "OTROS")
+    return df
+
+
+def add_trend(fig: go.Figure, x_data, y_data,
+              color: str = "black", name: str = "Tendencia") -> None:
+    x = np.asarray(x_data, dtype=float)
+    y = np.asarray(y_data, dtype=float)
+    valid = ~(np.isnan(x) | np.isnan(y))
+    x, y = x[valid], y[valid]
+    if len(x) < 3:
+        return
+    m, b = np.polyfit(x, y, 1)
+    x_range = np.linspace(x.min(), x.max(), 200)
+    fig.add_trace(go.Scatter(
+        x=x_range, y=m * x_range + b,
+        mode="lines", name=name,
+        line=dict(color=color, width=2, dash="dash"),
+        showlegend=True,
+    ))
+
+
+@st.cache_data
+def load_data():
+    df  = pd.read_csv("resultados/resultados_presidenciales_2026_municipios.csv")
+    mun = pd.read_csv("resultados/municipios_analisis.csv")
+    pre = pd.read_csv("resultados/prediccion_segunda_vuelta.csv")
+    with open("resultados/colombia_depts.json", encoding="utf-8") as f:
+        geo_depts = json.load(f)
+    with open("resultados/colombia_munis.json", encoding="utf-8") as f:
+        geo_munis = json.load(f)
+
+    # DIVIPOLA dept code (para coropletas departamentales)
+    mun["divipola_dept"] = mun["dept_co"].map(REG_TO_DIVIPOLA)
+    df["divipola_dept"]  = df["dept_co"].map(REG_TO_DIVIPOLA)
+
+    # DIVIPOLA municipality code via nombre normalizado (92 %+ cobertura)
+    geo_lookup = build_geo_lookup(geo_munis)
+
+    # Manual corrections: (reg_dept_co_int, _norm(reg_muni_nombre)) → DIVIPOLA_muni_code
+    MANUAL_CODES: dict[tuple, str] = {
+        # Antioquia (05)
+        (1,  "ANTIOQUIA"):                   "05042",  # Santa Fe de Antioquia
+        (1,  "BOLIVAR"):                     "05093",  # Ciudad Bolívar
+        (1,  "DON MATIAS"):                  "05237",  # Donmatías
+        (1,  "PUERTO NARE-LA MAGDALENA"):    "05585",
+        (1,  "YONDO-CASABE"):                "05895",
+        # Bogotá
+        (16, "BOGOTA. D.C."):                "11001",
+        (16, "BOGOTA, D.C."):                "11001",
+        # Bolívar dept (13)
+        (5,  "ARROYO HONDO"):                "13042",  # Arroyohondo
+        (5,  "RIOVIEJO"):                    "13600",  # Río Viejo
+        (5,  "TIQUISIO (PTO. RICO)"):        "13780",
+        # Boyacá (15)
+        (7,  "AQUITANIA (PUEBLOVIEJO)"):     "15022",
+        (7,  "VILLA DE LEIVA"):              "15407",  # Villa de Leyva (spelling)
+        # Cauca (19)
+        (11, "LOPEZ (MICAY)"):               "19364",  # López de Micay
+        (11, "PAEZ (BELALCAZAR)"):           "19517",
+        (11, "PATIA (EL BORDO)"):            "19532",
+        (11, "PURACE (COCONUCO)"):           "19573",
+        (11, "SOTARA (PAISPAMBA)"):          "19698",  # Sotará - Paispamba
+        # Chocó (27)
+        (17, "ALTO BAUDO (PIE DE PATO)"):    "27025",
+        (17, "ATRATO (YUTO)"):               "27050",
+        (17, "BAHIA SOLANO (MUTIS)"):        "27073",
+        (17, "BAJO BAUDO (PIZARRO)"):        "27075",
+        (17, "BOJAYA (BELLAVISTA)"):         "27099",
+        (17, "MEDIO ATRATO (BETE)"):         "27425",
+        (17, "MEDIO BAUDO (PUERTO MELUK)"):  "27430",
+        (17, "NUEVO BELEN DE BAJIRA"):       "27450",
+        (17, "RIO QUITO (PAIMADO)"):         "27600",
+        # Córdoba (23)
+        (13, "COTORRA (BONGO)"):             "23162",
+        (13, "LA APARTADA (FRONTERA)"):      "23350",
+        # Cundinamarca (25)
+        (15, "PARATEBUENO (LA NAGUAYA)"):    "25530",
+        (15, "UBATE"):                       "25843",
+        # Guainía (85 → REG 50)
+        (50, "MORICHAL (MORICHAL NUEVO)"):   "94888",
+        (50, "PANA PANA (CAMPO ALEGRE)"):    "94886",
+        # Huila (41 → REG 19)
+        (19, "LA ARGENTINA (PLATA VIEJA)"):  "41244",
+        (19, "TESALIA (CARNICERIAS)"):       "41770",
+        # Magdalena (47 → REG 21)
+        (21, "ARIGUANI (EL DIFICIL)"):       "47053",
+        (21, "ZONA BANANERA (SEVILLA)"):     "47980",
+        # Meta (50 → REG 52)
+        (52, "SAN MARTIN DE LOS LLANOS"):    "50689",  # San Martín
+        (52, "VISTA HERMOSA"):               "50711",  # Vistahermosa
+        # Nariño (52 → REG 23)
+        (23, "ALBAN (SAN JOSE)"):            "52019",
+        (23, "ARBOLEDA (BERRUECOS)"):        "52036",
+        (23, "COLON (GENOVA)"):              "52203",
+        (23, "CUASPUD (CARLOSAMA)"):         "52224",  # Cuaspud Carlosama
+        (23, "LOS ANDES (SOTOMAYOR)"):       "52385",
+        (23, "MAGUI (PAYAN)"):               "52399",
+        (23, "MALLAMA (PIEDRANCHA)"):        "52405",
+        (23, "ROBERTO PAYAN (SAN JOSE)"):    "52612",
+        (23, "SANTA BARBARA (ISCUANDE)"):    "52696",
+        (23, "SANTACRUZ (GUACHAVES)"):       "52699",
+        (23, "TUMACO"):                      "52835",  # San Andrés de Tumaco
+        # Norte de Santander (54 → REG 25)
+        (25, "CUCUTA"):                      "54001",  # San José de Cúcuta
+        # Putumayo (86 → REG 64)
+        (64, "SAN MIGUEL (LA DORADA)"):      "86757",
+        # Sucre (70 → REG 28)
+        (28, "COLOSO (RICAURTE)"):           "70204",
+        (28, "GALERAS (NUEVA GRANADA)"):     "70235",
+        (28, "TOLU"):                        "70820",
+        (28, "TOLUVIEJO"):                   "70823",
+        # Tolima (73 → REG 29)
+        (29, "ARMERO (GUAYABAL)"):           "73055",
+        (29, "MARIQUITA"):                   "73411",  # San Sebastián de Mariquita
+        # Valle (76 → REG 31)
+        (31, "CALIMA (DARIEN)"):             "76126",
+        # Vaupés (97 → REG 68)
+        (68, "BUENOS AIRES (PACOA)"):        "97161",  # Pacoa
+        (68, "MORICHAL (PAPUNAGUA)"):        "97511",
+        # Amazonas (91 → REG 60)
+        (60, "MIRITI PARANA"):               "91430",  # Mirití - Paraná
+    }
+
+    ARTICLES = ("EL ", "LA ", "LOS ", "LAS ")
+    SUFFIXES = (" D.C.", " D.E.", " DISTRITO ESPECIAL", " DIST ESPECIAL")
+
+    def get_divipola(dept_co, muni_nombre):
+        dept_int = int(dept_co)
+        dpto = REG_TO_DIVIPOLA.get(dept_int, "")
+        if not dpto:
+            return ""
+        norm = _norm(muni_nombre)
+
+        # 0. Manual correction table
+        v = MANUAL_CODES.get((dept_int, norm), "")
+        if v:
+            return v
+
+        # 1. Exact match
+        v = geo_lookup.get((dpto, norm), "")
+        if v:
+            return v
+
+        # 2. Without leading article
+        for art in ARTICLES:
+            if norm.startswith(art):
+                v = geo_lookup.get((dpto, norm[len(art):]), "")
+                if v:
+                    return v
+
+        # 3. Without trailing district suffix
+        for suf in SUFFIXES:
+            if norm.endswith(suf):
+                v = geo_lookup.get((dpto, norm[: -len(suf)].strip()), "")
+                if v:
+                    return v
+
+        # 4. Strip parenthetical (e.g. "TIQUISIO (PTO. RICO)" → "TIQUISIO")
+        if " (" in norm:
+            base = norm.split(" (")[0].strip()
+            v = geo_lookup.get((dpto, base), "")
+            if v:
+                return v
+
+        # 5. Strip hyphen suffix (e.g. "PUERTO NARE-LA MAGDALENA" → "PUERTO NARE")
+        if "-" in norm:
+            base = norm.split("-")[0].strip()
+            v = geo_lookup.get((dpto, base), "")
+            if v:
+                return v
+
+        # 6. Prefix match (first 14 chars) as last resort
+        prefix = norm[:14]
+        for (d, n), code in geo_lookup.items():
+            if d == dpto and n.startswith(prefix):
+                return code
+
+        return ""
+
+    mun["divipola_muni"] = mun.apply(
+        lambda r: get_divipola(r["dept_co"], r["muni_nombre"]), axis=1
+    )
+
+    # GeoJSON filtrado solo con Antioquia (más rápido y mejor zoom en ese mapa)
+    geo_ant = {
+        "type": "FeatureCollection",
+        "features": [
+            f for f in geo_munis["features"]
+            if f["properties"]["DPTO_CCDGO"] == "05"
+        ],
+    }
+
+    return df, mun, pre, geo_depts, geo_munis, geo_ant
+
+
+df, mun, pre, geo_depts, geo_munis, geo_ant = load_data()
+
+# ── Detección de tema (light / dark) ──────────────────────────────────────────
+_theme_base  = st.get_option("theme.base") or "dark"
+_is_dark     = _theme_base != "light"
+# Plotly template that matches the current theme
+_PLOTLY_TPL  = "plotly_dark" if _is_dark else "plotly_white"
+# Geo colors for the world map
+_GEO_LAND    = "rgba(55,55,55,0.45)"   if _is_dark else "rgba(210,210,210,0.6)"
+_GEO_OCEAN   = "rgba(20,35,55,0.55)"   if _is_dark else "rgba(170,210,240,0.55)"
+_GEO_COAST   = "rgba(255,255,255,0.15)" if _is_dark else "rgba(80,80,80,0.35)"
+
+# Separar voto interior (municipios) del exterior (consulados)
+df_interior  = df[df["dept_nombre"] != "CONSULADOS"]
+df_exterior  = df[df["dept_nombre"] == "CONSULADOS"]
+mun_interior = mun[mun["dept_nombre"] != "CONSULADOS"]
+mun_exterior = mun[mun["dept_nombre"] == "CONSULADOS"]
+
+
+# ── Sidebar ───────────────────────────────────────────────────────────────────
+st.sidebar.title("Elecciones 2026")
+st.sidebar.markdown("**Filtros globales**")
+
+dept_opts = (["Todos", "── Exterior (Consulados) ──"]
+             + sorted(df_interior["dept_nombre"].unique().tolist()))
+sel_dept = st.sidebar.selectbox("Departamento", dept_opts)
+
+candidatos = ["Todos"] + sorted(df["candidato_presidente"].unique().tolist())
+sel_cand   = st.sidebar.selectbox("Candidato", candidatos)
+
+# Filtros aplicados
+EXTERIOR_LABEL = "── Exterior (Consulados) ──"
+if sel_dept == EXTERIOR_LABEL:
+    df_f  = df_exterior.copy()
+    mun_f = mun_exterior.copy()
+elif sel_dept != "Todos":
+    df_f  = df_interior[df_interior["dept_nombre"]   == sel_dept].copy()
+    mun_f = mun_interior[mun_interior["dept_nombre"] == sel_dept].copy()
+else:
+    df_f  = df_interior.copy()   # "Todos" = solo interior; exterior tiene sección propia
+    mun_f = mun_interior.copy()
+
+if sel_cand != "Todos":
+    df_f = df_f[df_f["candidato_presidente"] == sel_cand]
+
+# Etiqueta de municipio con departamento cuando hay nombres duplicados entre deptos
+_dup_munis = (
+    mun_interior["muni_nombre"]
+    .value_counts()
+    .pipe(lambda s: s[s > 1].index)
+    .tolist()
+)
+
+def _muni_label(row: pd.Series) -> str:
+    if row["muni_nombre"] in _dup_munis:
+        dept_abbr = row["dept_nombre"][:6]
+        return f"{row['muni_nombre']} ({dept_abbr})"
+    return row["muni_nombre"]
+
+mun_f["muni_label"] = mun_f.apply(_muni_label, axis=1)
+
+
+# ── Callback para restablecer sliders de Proyección ───────────────────────────
+def _reset_proyeccion() -> None:
+    _dae  = {"PALOMA VALENCIA LASERNA": 72, "SERGIO FAJARDO VALDERRAMA": 22,
+             "CLAUDIA LÓPEZ": 10, "OTROS": 35}
+    _dic  = {"PALOMA VALENCIA LASERNA":  6, "SERGIO FAJARDO VALDERRAMA": 48,
+             "CLAUDIA LÓPEZ": 58, "OTROS": 35}
+    _dabs = {"PALOMA VALENCIA LASERNA": 22, "SERGIO FAJARDO VALDERRAMA": 30,
+             "CLAUDIA LÓPEZ": 32, "OTROS": 30}
+    for f in ["PALOMA VALENCIA LASERNA", "SERGIO FAJARDO VALDERRAMA", "CLAUDIA LÓPEZ", "OTROS"]:
+        st.session_state[f"ae_{f}"]  = _dae[f]
+        st.session_state[f"ic_{f}"]  = _dic[f]
+        st.session_state[f"abs_{f}"] = _dabs[f]
+
+
+# ── Tabs ──────────────────────────────────────────────────────────────────────
+t1, t2, t7, t3, t4, t5, t6 = st.tabs([
+    "Resultados Nacionales",
+    "Por Departamento",
+    "Solo Antioquia",
+    "Fuerza Abelardo",
+    "Fuerza Paloma",
+    "Análisis Coalición",
+    "Proyección 2ª Vuelta",
+])
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TAB 1 – RESULTADOS NACIONALES
+# ═══════════════════════════════════════════════════════════════════════════════
+with t1:
+    st.title("Resultados Primera Vuelta – Colombia 2026")
+
+    # ── Cálculos ─────────────────────────────────────────────────────────────────
+    nac_int = df_interior.drop_duplicates("muni_co")
+    nac_ext = df_exterior.drop_duplicates("muni_co")
+
+    _hab_int    = int((nac_int["total_votantes"] + nac_int["total_abstencion"]).sum())
+    _vot_int    = int(nac_int["total_votantes"].sum())
+    _hab_ext    = int((nac_ext["total_votantes"] + nac_ext["total_abstencion"]).sum())
+    _vot_ext    = int(nac_ext["total_votantes"].sum())
+    _pct_ext    = _vot_ext / _hab_ext * 100 if _hab_ext > 0 else 0.0
+    _consul_n   = df_exterior["muni_co"].nunique()
+
+    # Total nacional = interior + exterior (coincide con el censo electoral oficial)
+    _hab_nac    = _hab_int + _hab_ext
+    _vot_nac    = _vot_int + _vot_ext
+    _pct_part   = _vot_nac / _hab_nac * 100 if _hab_nac > 0 else 0.0
+
+    # ── Métricas nacionales ───────────────────────────────────────────────────────
+    st.caption("Total nacional (interior + exterior)")
+    cn1, cn2, cn3 = st.columns(3)
+    cn1.metric("Habilitados para votar", f"{_hab_nac:,}")
+    cn2.metric("Votantes",              f"{_vot_nac:,}")
+    cn3.metric("% Participación",       f"{_pct_part:.2f}%")
+
+    # ── Métricas interior ────────────────────────────────────────────────────────
+    st.caption("Municipios interiores")
+    c4, c5, c6 = st.columns(3)
+    c4.metric("Votos válidos",    f"{int(nac_int['votos_validos'].sum()):,}")
+    c5.metric("Mesas escrutadas", f"{int(nac_int['mesas_escrutadas'].sum()):,} / {int(nac_int['mesas_total'].sum()):,}")
+    c6.metric("Municipios",       f"{df_interior['muni_co'].nunique():,}")
+
+    # ── Métricas exterior ────────────────────────────────────────────────────────
+    st.caption("Voto en el exterior (consulados)")
+    cx1, cx2, cx3, cx4 = st.columns(4)
+    cx1.metric("Habilitados exterior", f"{_hab_ext:,}")
+    cx2.metric("Votantes exterior",    f"{_vot_ext:,}")
+    cx3.metric("% Participación ext.", f"{_pct_ext:.2f}%")
+    cx4.metric("Consulados",           f"{_consul_n:,}")
+
+    st.divider()
+
+    # Agrupación con OTROS
+    agg_raw = (df_f.groupby("candidato_presidente", as_index=False)
+                   .agg(votos=("votos_candidato", "sum"))
+                   .sort_values("votos", ascending=False))
+
+    # Separar top-4 + OTROS
+    top4_rows  = agg_raw[agg_raw["candidato_presidente"].isin(TOP_CANDS)]
+    otros_sum  = agg_raw[~agg_raw["candidato_presidente"].isin(TOP_CANDS)]["votos"].sum()
+    otros_row  = pd.DataFrame([{"candidato_presidente": "OTROS", "votos": otros_sum}])
+    agg        = (pd.concat([top4_rows, otros_row], ignore_index=True)
+                    .sort_values("votos", ascending=False))
+    agg["pct"] = agg["votos"] / agg["votos"].sum() * 100
+
+    col_a, col_b = st.columns([3, 2])
+    with col_a:
+        st.subheader("Votos por candidato")
+        fig = px.bar(
+            agg, x="votos", y="candidato_presidente",
+            orientation="h", color="candidato_presidente",
+            color_discrete_map=COLORS,
+            text=agg["votos"].apply(lambda v: f"{v:,.0f}"),
+            labels={"votos": "Votos", "candidato_presidente": ""},
+        )
+        fig.update_traces(
+            textposition="outside",
+            cliponaxis=False,       # permite que el texto salga más allá del eje
+        )
+        fig.update_layout(
+            showlegend=False, height=320,
+            # margen derecho amplio para que los números no se corten
+            margin=dict(l=0, r=160, t=10, b=0),
+            yaxis={"categoryorder": "total ascending"},
+            xaxis={"autorange": True},
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+    with col_b:
+        st.subheader("Distribución %")
+        # Nombres cortos para que quepan dentro de las porciones
+        agg_pie = agg.copy()
+        SHORT = {
+            "ABELARDO DE LA ESPRIELLA": "Abelardo",
+            "IVÁN CEPEDA CASTRO":       "Cepeda",
+            "PALOMA VALENCIA LASERNA":  "Paloma",
+            "SERGIO FAJARDO VALDERRAMA":"Fajardo",
+            "OTROS":                    "Otros",
+        }
+        agg_pie["nombre_corto"] = agg_pie["candidato_presidente"].map(
+            lambda x: SHORT.get(x, x.split()[0])
+        )
+        fig2 = px.pie(
+            agg_pie, values="votos", names="nombre_corto",
+            color="candidato_presidente", color_discrete_map=COLORS, hole=0.4,
+        )
+        fig2.update_traces(
+            texttemplate="<b>%{label}</b><br>%{percent:.1%}",
+            textposition="inside",
+            insidetextorientation="radial",
+        )
+        fig2.update_layout(
+            showlegend=False, height=320,
+            margin=dict(l=10, r=10, t=10, b=10),
+        )
+        st.plotly_chart(fig2, use_container_width=True)
+
+    # ── Mapa: ganador por departamento ──────────────────────────────────────
+    st.subheader("Ganador por departamento")
+
+    # Calcular ganador por departamento (sobre todos los datos, sin filtro de candidato)
+    df_map = df[df["candidato_presidente"].isin(TOP_CANDS)].copy()
+    _dept_all = (
+        df_map.groupby(["dept_nombre", "candidato_presidente"], as_index=False)
+              .agg(votos=("votos_candidato", "sum"))
+    )
+    dept_winner = (
+        _dept_all.sort_values("votos", ascending=False)
+                 .drop_duplicates("dept_nombre")
+    )
+    # Añadir votos AE y IC para hover
+    _ae_ic = (_dept_all[_dept_all["candidato_presidente"].isin(
+                   ["ABELARDO DE LA ESPRIELLA", "IVÁN CEPEDA CASTRO"])]
+              .pivot(index="dept_nombre", columns="candidato_presidente", values="votos")
+              .rename(columns={"ABELARDO DE LA ESPRIELLA": "v_AE",
+                               "IVÁN CEPEDA CASTRO": "v_IC"})
+              .reset_index())
+    _ae_ic.columns.name = None
+    dept_winner = dept_winner.merge(_ae_ic, on="dept_nombre", how="left")
+    dept_winner["divipola"] = dept_winner["dept_nombre"].map(DEPT_TO_DIVIPOLA)
+    dept_winner = dept_winner.dropna(subset=["divipola"])
+
+    fig_map = px.choropleth(
+        dept_winner,
+        geojson=geo_depts,
+        locations="divipola",
+        featureidkey="properties.DPTO",
+        color="candidato_presidente",
+        color_discrete_map=COLORS,
+        hover_name="dept_nombre",
+        hover_data={"v_AE": ":,", "v_IC": ":,", "divipola": False},
+        labels={"candidato_presidente": "Ganador", "v_AE": "V. Abelardo", "v_IC": "V. Cepeda"},
+        title="",
+    )
+    fig_map.update_geos(fitbounds="locations", visible=False)
+    fig_map.update_layout(
+        height=500, margin=dict(l=0, r=0, t=0, b=0),
+        paper_bgcolor="rgba(0,0,0,0)",
+        geo=dict(bgcolor="rgba(0,0,0,0)"),
+    )
+    st.plotly_chart(fig_map, use_container_width=True)
+
+    # ── Tabla con dptos ganados ──────────────────────────────────────────────
+    st.subheader("Tabla de resultados")
+
+    # Departamentos ganados por candidato
+    dptos_ganados = dept_winner.groupby("candidato_presidente")["dept_nombre"].count()
+
+    tabla = agg[["candidato_presidente", "votos", "pct"]].copy()
+    tabla.columns = ["Candidato", "Votos", "% Votos"]
+    tabla["Dptos. ganados"] = tabla["Candidato"].map(dptos_ganados).fillna(0).astype(int)
+    tabla = tabla.sort_values("Votos", ascending=False).reset_index(drop=True)
+    tabla["Votos"]   = tabla["Votos"].apply(lambda v: f"{v:,.0f}")
+    tabla["% Votos"] = tabla["% Votos"].apply(lambda v: f"{v:.2f}%")
+    st.dataframe(tabla, use_container_width=True, hide_index=True)
+
+    # ── Voto en el Exterior ──────────────────────────────────────────────────
+    st.divider()
+    st.subheader("Voto en el Exterior (Consulados)")
+
+    ext_cand = (df_exterior.groupby("candidato_presidente", as_index=False)
+                           .agg(votos=("votos_candidato", "sum"))
+                           .sort_values("votos", ascending=False))
+    ext_cand["pct"] = ext_cand["votos"] / ext_cand["votos"].sum() * 100
+
+    col_ext1, col_ext2 = st.columns([3, 2])
+    with col_ext1:
+        fig_ext = px.bar(
+            ext_cand, x="votos", y="candidato_presidente",
+            orientation="h", color="candidato_presidente",
+            color_discrete_map=COLORS,
+            text=ext_cand["votos"].apply(lambda v: f"{v:,}"),
+            labels={"votos": "Votos exterior", "candidato_presidente": ""},
+        )
+        fig_ext.update_traces(textposition="outside")
+        fig_ext.update_layout(
+            showlegend=False, height=350,
+            margin=dict(l=0, r=60, t=10, b=0),
+            yaxis={"categoryorder": "total ascending"},
+            title="Votos por candidato – Exterior",
+        )
+        st.plotly_chart(fig_ext, use_container_width=True)
+
+    with col_ext2:
+        ext_pais = (df_exterior.groupby("muni_nombre", as_index=False)
+                               .agg(total=("votos_candidato", "sum"))
+                               .sort_values("total", ascending=False)
+                               .head(15))
+        st.caption("Top 15 consulados por participación")
+        fig_pais = px.bar(
+            ext_pais.sort_values("total", ascending=True),
+            x="total", y="muni_nombre", orientation="h",
+            color_discrete_sequence=["#5588bb"],
+            labels={"total": "Votos", "muni_nombre": ""},
+        )
+        fig_pais.update_layout(height=350, margin=dict(l=0, r=10, t=10, b=0),
+                               yaxis={"categoryorder": "total ascending"})
+        st.plotly_chart(fig_pais, use_container_width=True)
+
+    tabla_ext = ext_cand.copy()
+    tabla_ext["Votos"] = tabla_ext["votos"].apply(lambda v: f"{v:,}")
+    tabla_ext["% del exterior"] = tabla_ext["pct"].apply(lambda v: f"{v:.2f}%")
+    st.dataframe(tabla_ext[["candidato_presidente", "Votos", "% del exterior"]].rename(
+        columns={"candidato_presidente": "Candidato"}),
+        use_container_width=True, hide_index=True)
+
+    # ── Mapa mundial: ganador por país ───────────────────────────────────────
+    st.subheader("Mapa mundial – Ganador por país")
+
+    PAIS_ISO3 = {
+        "ALEMANIA": "DEU", "ARGENTINA": "ARG", "AUSTRALIA": "AUS",
+        "AUSTRIA": "AUT", "BELGICA": "BEL", "BOLIVIA": "BOL",
+        "BRASIL": "BRA", "CANADA": "CAN", "CHILE": "CHL",
+        "CHINA": "CHN", "COLOMBIA": "COL", "COSTA RICA": "CRI",
+        "CUBA": "CUB", "DINAMARCA": "DNK", "ECUADOR": "ECU",
+        "EGIPTO": "EGY", "EL SALVADOR": "SLV", "EMIRATOS": "ARE",
+        "ESPANA": "ESP", "ESPAÑA": "ESP", "ESTADOS UNIDOS": "USA",
+        "FILIPINAS": "PHL", "FINLANDIA": "FIN", "FRANCIA": "FRA",
+        "GRECIA": "GRC", "GUATEMALA": "GTM", "HOLANDA": "NLD",
+        "HONDURAS": "HND", "HUNGRIA": "HUN", "INDIA": "IND",
+        "ISRAEL": "ISR", "ITALIA": "ITA", "JAPON": "JPN",
+        "JORDANIA": "JOR", "LIBANO": "LBN", "LIBIA": "LBY",
+        "LUXEMBURGO": "LUX", "MARRUECOS": "MAR", "MEXICO": "MEX",
+        "NICARAGUA": "NIC", "NIGERIA": "NGA", "NORUEGA": "NOR",
+        "NUEVA ZELANDA": "NZL", "PANAMA": "PAN", "PARAGUAY": "PRY",
+        "PERU": "PER", "POLONIA": "POL", "PORTUGAL": "PRT",
+        "REINO UNIDO": "GBR", "REPUBLICA DOMINICANA": "DOM",
+        "RUSIA": "RUS", "SUECIA": "SWE", "SUIZA": "CHE",
+        "TAILANDIA": "THA", "TRINIDAD Y TOBAGO": "TTO", "TURQUIA": "TUR",
+        "UCRANIA": "UKR", "URUGUAY": "URY", "VENEZUELA": "VEN",
+        # Países adicionales presentes en datos de consulados
+        "ARUBA": "ABW", "AZERBAIYAN": "AZE", "COREA DEL SUR": "KOR",
+        "CURAZAO": "CUW", "GHANA": "GHA", "HAITI": "HTI",
+        "INDONESIA": "IDN", "INGLATERRA": "GBR", "IRLANDA": "IRL",
+        "JAMAICA": "JAM", "KENIA": "KEN", "MALASIA": "MYS",
+        "NUEVA ZELANDIA": "NZL", "PAISES BAJOS": "NLD", "PUERTO RICO": "PRI",
+        "REPUBLICA DE SINGAPUR": "SGP",
+        "REPUBLICA SOCIALISTA DE VIETNA": "VNM", "SUDAFRICA": "ZAF",
+    }
+
+    def _pais_from_muni(name: str) -> str:
+        n = _norm(name)
+        if "-" in n:
+            candidate = n.split("-")[-1].strip()
+            if candidate in PAIS_ISO3:
+                return candidate
+        for pais in sorted(PAIS_ISO3, key=len, reverse=True):
+            if pais in n:
+                return pais
+        return ""
+
+    df_ext_top = df_exterior[df_exterior["candidato_presidente"].isin(TOP_CANDS)].copy()
+    df_ext_top["pais_key"] = df_ext_top["muni_nombre"].apply(_pais_from_muni)
+    df_ext_top = df_ext_top[df_ext_top["pais_key"] != ""]
+
+    _pais_all = (
+        df_ext_top.groupby(["pais_key", "candidato_presidente"], as_index=False)
+                  .agg(votos=("votos_candidato", "sum"))
+    )
+    pais_winner = (
+        _pais_all.sort_values("votos", ascending=False)
+                 .drop_duplicates("pais_key")
+    )
+    _pais_ae_ic = (
+        _pais_all[_pais_all["candidato_presidente"].isin(
+            ["ABELARDO DE LA ESPRIELLA", "IVÁN CEPEDA CASTRO"])]
+        .pivot(index="pais_key", columns="candidato_presidente", values="votos")
+        .rename(columns={"ABELARDO DE LA ESPRIELLA": "v_AE",
+                         "IVÁN CEPEDA CASTRO": "v_IC"})
+        .reset_index()
+    )
+    _pais_ae_ic.columns.name = None
+    pais_winner = pais_winner.merge(_pais_ae_ic, on="pais_key", how="left")
+    pais_winner["iso3"] = pais_winner["pais_key"].map(PAIS_ISO3)
+    pais_winner = pais_winner.dropna(subset=["iso3"])
+
+    if not pais_winner.empty:
+        fig_world = px.choropleth(
+            pais_winner,
+            locations="iso3",
+            color="candidato_presidente",
+            color_discrete_map=COLORS,
+            hover_name="pais_key",
+            hover_data={"v_AE": ":,", "v_IC": ":,", "iso3": False},
+            labels={"candidato_presidente": "Ganador",
+                    "v_AE": "V. Abelardo", "v_IC": "V. Cepeda"},
+            projection="natural earth",
+        )
+        fig_world.update_layout(
+            height=420, margin=dict(l=0, r=0, t=0, b=0),
+            paper_bgcolor="rgba(0,0,0,0)",
+            template=_PLOTLY_TPL,
+            geo=dict(
+                bgcolor="rgba(0,0,0,0)",
+                showframe=False,
+                showcoastlines=True,
+                coastlinecolor=_GEO_COAST,
+                landcolor=_GEO_LAND,
+                oceancolor=_GEO_OCEAN,
+                showocean=True,
+                showland=True,
+            ),
+        )
+        st.plotly_chart(fig_world, use_container_width=True)
+    else:
+        st.caption("No se pudo mapear países desde los nombres de consulados.")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TAB 2 – POR DEPARTAMENTO
+# ═══════════════════════════════════════════════════════════════════════════════
+with t2:
+    st.title("Distribución por Departamento")
+
+    # Agrupación con OTROS por departamento — solo interior (sin consulados)
+    df_dept = group_otros(df_interior, "candidato_presidente").copy()
+    agg_d = (df_dept.groupby(["dept_nombre", "candidato_presidente"], as_index=False)
+                    .agg(votos=("votos_candidato", "sum")))
+
+    # Ordenar departamentos por total de votos descendente
+    orden_dept = (agg_d.groupby("dept_nombre")["votos"].sum()
+                       .sort_values(ascending=False).index.tolist())
+
+    # Calcular porcentaje dentro de cada departamento
+    agg_d["total_dept"] = agg_d.groupby("dept_nombre")["votos"].transform("sum")
+    agg_d["pct_dept"]   = agg_d["votos"] / agg_d["total_dept"] * 100
+
+    st.subheader("Distribución % por departamento – Colombia interior (top 4 + Otros)")
+    fig = px.bar(
+        agg_d,
+        x="dept_nombre",
+        y="pct_dept",
+        color="candidato_presidente",
+        color_discrete_map=COLORS,
+        category_orders={
+            "dept_nombre": orden_dept,
+            "candidato_presidente": TOP_CANDS + ["OTROS"],
+        },
+        labels={
+            "pct_dept": "% Votos",
+            "dept_nombre": "Departamento",
+            "candidato_presidente": "Candidato",
+        },
+        barmode="stack",
+    )
+    fig.update_layout(
+        height=520, xaxis_tickangle=-45,
+        legend_title="Candidato",
+        margin=dict(b=120),
+        yaxis=dict(ticksuffix="%", range=[0, 101]),
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+    # ── Mapa: % AE por departamento ─────────────────────────────────────────
+    st.subheader("Mapa: % Abelardo vs Cepeda por departamento")
+
+    dept_agg2 = (df_interior.groupby(["dept_nombre", "candidato_presidente"], as_index=False)
+                             .agg(votos=("votos_candidato", "sum")))
+    total_dept = dept_agg2.groupby("dept_nombre")["votos"].sum().rename("total")
+    dept_agg2  = dept_agg2.join(total_dept, on="dept_nombre")
+    dept_agg2["pct"] = dept_agg2["votos"] / dept_agg2["total"] * 100
+
+    ae_dept = dept_agg2[dept_agg2["candidato_presidente"] == "ABELARDO DE LA ESPRIELLA"].copy()
+    ae_dept["divipola"] = ae_dept["dept_nombre"].map(DEPT_TO_DIVIPOLA)
+    ae_dept = ae_dept.dropna(subset=["divipola"])
+
+    col_ma, col_mb = st.columns(2)
+    with col_ma:
+        fig_ae = px.choropleth(
+            ae_dept,
+            geojson=geo_depts,
+            locations="divipola",
+            featureidkey="properties.DPTO",
+            color="pct",
+            color_continuous_scale="Blues",
+            hover_name="dept_nombre",
+            hover_data={"pct": ":.1f", "votos": ":,", "divipola": False},
+            labels={"pct": "% Abelardo"},
+            title="% Abelardo",
+        )
+        fig_ae.update_geos(fitbounds="locations", visible=False)
+        fig_ae.update_layout(
+            height=420, margin=dict(l=0, r=0, t=30, b=0),
+            paper_bgcolor="rgba(0,0,0,0)",
+            geo=dict(bgcolor="rgba(0,0,0,0)"),
+        )
+        st.plotly_chart(fig_ae, use_container_width=True)
+
+    with col_mb:
+        ic_dept = dept_agg2[dept_agg2["candidato_presidente"] == "IVÁN CEPEDA CASTRO"].copy()
+        ic_dept["divipola"] = ic_dept["dept_nombre"].map(DEPT_TO_DIVIPOLA)
+        ic_dept = ic_dept.dropna(subset=["divipola"])
+        fig_ic = px.choropleth(
+            ic_dept,
+            geojson=geo_depts,
+            locations="divipola",
+            featureidkey="properties.DPTO",
+            color="pct",
+            color_continuous_scale="Reds",
+            hover_name="dept_nombre",
+            hover_data={"pct": ":.1f", "votos": ":,", "divipola": False},
+            labels={"pct": "% Cepeda"},
+            title="% Cepeda",
+        )
+        fig_ic.update_geos(fitbounds="locations", visible=False)
+        fig_ic.update_layout(
+            height=420, margin=dict(l=0, r=0, t=30, b=0),
+            paper_bgcolor="rgba(0,0,0,0)",
+            geo=dict(bgcolor="rgba(0,0,0,0)"),
+        )
+        st.plotly_chart(fig_ic, use_container_width=True)
+
+    # ── Mapa municipal: ganador por municipio ───────────────────────────────
+    st.subheader("Mapa: ganador por municipio")
+
+    mun_winner = mun[["dept_nombre", "muni_nombre", "divipola_muni",
+                       "ganador", "votos_AE", "votos_IC", "diff_AE_IC"]].copy()
+    mun_winner = mun_winner[mun_winner["divipola_muni"] != ""]
+
+    fig_muni = px.choropleth(
+        mun_winner,
+        geojson=geo_munis,
+        locations="divipola_muni",
+        featureidkey="properties.MPIO_CCNCT",
+        color="ganador",
+        color_discrete_map=GANADOR_COLORS,
+        hover_name="muni_nombre",
+        hover_data={
+            "dept_nombre": True,
+            "votos_AE": ":,",
+            "votos_IC": ":,",
+            "diff_AE_IC": ":,",
+            "divipola_muni": False,
+        },
+        labels={"ganador": "Ganador", "diff_AE_IC": "Diferencia AE−IC"},
+    )
+    fig_muni.update_geos(fitbounds="locations", visible=False)
+    fig_muni.update_layout(
+        height=620, margin=dict(l=0, r=0, t=0, b=0),
+        paper_bgcolor="rgba(0,0,0,0)",
+        geo=dict(bgcolor="rgba(0,0,0,0)"),
+    )
+    st.plotly_chart(fig_muni, use_container_width=True)
+
+    # Participación promedio
+    st.subheader("Participación promedio por departamento")
+    part = (mun.groupby("dept_nombre", as_index=False)
+               .agg(part_prom=("pct_participacion", "mean"))
+               .sort_values("part_prom", ascending=False))
+    fig2 = px.bar(
+        part, x="dept_nombre", y="part_prom",
+        color="part_prom", color_continuous_scale="Blues",
+        labels={"dept_nombre": "Departamento", "part_prom": "% Participación"},
+    )
+    fig2.update_layout(height=400, xaxis_tickangle=-45, margin=dict(b=120))
+    st.plotly_chart(fig2, use_container_width=True)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TAB 3 – FUERZA ABELARDO
+# ═══════════════════════════════════════════════════════════════════════════════
+with t3:
+    st.title("Donde fue fuerte Abelardo De La Espriella")
+
+    top_n = st.slider("Número de municipios", 10, 100, 30)
+    top = mun_f.nlargest(top_n, "pct_AE")[
+        ["dept_nombre", "muni_nombre", "muni_label", "votos_AE", "pct_AE",
+         "votos_IC", "pct_IC", "diff_AE_IC"]
+    ].reset_index(drop=True)
+
+    col_a, col_b = st.columns([3, 2])
+    with col_a:
+        st.subheader(f"Top {top_n} municipios por % AE")
+        fig = px.bar(
+            top.sort_values("pct_AE", ascending=True),
+            x="pct_AE", y="muni_label",
+            color="dept_nombre",
+            orientation="h",
+            labels={"pct_AE": "% Votos AE", "muni_label": "", "dept_nombre": "Depto."},
+        )
+        fig.update_layout(
+            height=max(400, top_n * 20), showlegend=True,
+            margin=dict(l=0, r=20, t=10, b=0),
+            yaxis={"categoryorder": "total ascending"},
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+    with col_b:
+        st.subheader("Datos")
+        top_show = top[["dept_nombre", "muni_label", "votos_AE", "pct_AE",
+                         "votos_IC", "pct_IC", "diff_AE_IC"]].copy()
+        top_show["votos_AE"]   = top_show["votos_AE"].apply(lambda v: f"{v:,.0f}")
+        top_show["votos_IC"]   = top_show["votos_IC"].apply(lambda v: f"{v:,.0f}")
+        top_show["pct_AE"]     = top_show["pct_AE"].apply(lambda v: f"{v:.1f}%")
+        top_show["pct_IC"]     = top_show["pct_IC"].apply(lambda v: f"{v:.1f}%")
+        top_show["diff_AE_IC"] = top_show["diff_AE_IC"].apply(lambda v: f"{v:+,.0f}")
+        top_show.columns = ["Depto", "Municipio", "V_AE", "% AE", "V_IC", "% IC", "Dif"]
+        st.dataframe(top_show, use_container_width=True, hide_index=True, height=600)
+
+    # Scatter % AE vs % IC con línea de tendencia
+    st.subheader("% AE vs % IC por municipio")
+    fig3 = px.scatter(
+        mun_f, x="pct_AE", y="pct_IC",
+        color="dept_nombre", hover_name="muni_label",
+        hover_data={"votos_AE": ":,", "votos_IC": ":,", "dept_nombre": True},
+        labels={"pct_AE": "% Abelardo", "pct_IC": "% Cepeda"},
+        opacity=0.7,
+    )
+    fig3.add_shape(
+        type="line", x0=0, y0=0, x1=100, y1=100,
+        line=dict(dash="dash", color="gray", width=1),
+    )
+    add_trend(fig3, mun_f["pct_AE"], mun_f["pct_IC"], color="black", name="Tendencia")
+    fig3.update_layout(height=440)
+    st.plotly_chart(fig3, use_container_width=True)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TAB 4 – FUERZA PALOMA
+# ═══════════════════════════════════════════════════════════════════════════════
+with t4:
+    st.title("Donde fue fuerte Paloma Valencia Laserna")
+
+    top_n = st.slider("Número de municipios", 10, 100, 30, key="slider_paloma")
+    top = mun_f.nlargest(top_n, "pct_Valencia")[
+        ["dept_nombre", "muni_nombre", "muni_label", "votos_Valencia", "pct_Valencia",
+         "votos_AE", "votos_IC", "pct_AE", "pct_IC"]
+    ].reset_index(drop=True)
+
+    fig = px.bar(
+        top.sort_values("pct_Valencia", ascending=True),
+        x="pct_Valencia", y="muni_label",
+        color="dept_nombre",
+        orientation="h",
+        labels={"pct_Valencia": "% Votos Paloma", "muni_label": "", "dept_nombre": "Depto."},
+    )
+    fig.update_layout(
+        height=max(400, top_n * 20),
+        margin=dict(l=0, r=20, t=10, b=0),
+        yaxis={"categoryorder": "total ascending"},
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+    # Correlación Paloma ↔ AE y IC con tendencias
+    st.subheader("Correlación Paloma con AE y con IC (por municipio)")
+    col_a, col_b = st.columns(2)
+    with col_a:
+        fig2 = px.scatter(
+            mun_f, x="pct_Valencia", y="pct_AE",
+            color="dept_nombre", hover_name="muni_label", opacity=0.7,
+            hover_data={"dept_nombre": True},
+            labels={"pct_Valencia": "% Paloma", "pct_AE": "% Abelardo"},
+            title="Paloma vs Abelardo",
+        )
+        add_trend(fig2, mun_f["pct_Valencia"], mun_f["pct_AE"], name="Tendencia")
+        fig2.update_layout(showlegend=False)
+        st.plotly_chart(fig2, use_container_width=True)
+    with col_b:
+        fig3 = px.scatter(
+            mun_f, x="pct_Valencia", y="pct_IC",
+            color="dept_nombre", hover_name="muni_label", opacity=0.7,
+            hover_data={"dept_nombre": True},
+            labels={"pct_Valencia": "% Paloma", "pct_IC": "% Cepeda"},
+            title="Paloma vs Cepeda",
+        )
+        add_trend(fig3, mun_f["pct_Valencia"], mun_f["pct_IC"], name="Tendencia")
+        fig3.update_layout(showlegend=False)
+        st.plotly_chart(fig3, use_container_width=True)
+
+    st.subheader("Datos")
+    top_show = top[["dept_nombre", "muni_label", "votos_Valencia", "pct_Valencia",
+                     "votos_AE", "votos_IC", "pct_AE", "pct_IC"]].copy()
+    for c in ["votos_Valencia", "votos_AE", "votos_IC"]:
+        top_show[c] = top_show[c].apply(lambda v: f"{v:,.0f}")
+    for c in ["pct_Valencia", "pct_AE", "pct_IC"]:
+        top_show[c] = top_show[c].apply(lambda v: f"{v:.1f}%")
+    top_show.columns = ["Depto", "Municipio", "V_Paloma", "% Paloma",
+                        "V_AE", "V_IC", "% AE", "% IC"]
+    st.dataframe(top_show, use_container_width=True, hide_index=True)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TAB 5 – ANÁLISIS COALICIÓN
+# ═══════════════════════════════════════════════════════════════════════════════
+with t5:
+    st.title("Análisis Coalición – Constructor de escenarios")
+
+    # ── Configurar escenario ─────────────────────────────────────────────────
+    st.markdown("**Asigna el apoyo de cada candidato en segunda vuelta:**")
+    coal_opts = ["→ Abelardo", "→ Cepeda", "Ninguno"]
+
+    cfg_col1, cfg_col2, cfg_col3 = st.columns(3)
+    with cfg_col1:
+        apoyo_valencia = st.radio(
+            "Paloma Valencia (1,637,665 v.)",
+            coal_opts, index=0, horizontal=True, key="coal_paloma",
+        )
+    with cfg_col2:
+        apoyo_fajardo = st.radio(
+            "Sergio Fajardo (1,007,943 v.)",
+            coal_opts, index=0, horizontal=True, key="coal_fajardo",
+        )
+    with cfg_col3:
+        apoyo_claudia = st.radio(
+            "Claudia López (225,335 v.)*",
+            coal_opts, index=2, horizontal=True, key="coal_claudia",
+        )
+    st.caption("* Claudia López: solo total nacional disponible, sin desglose municipal")
+
+    # ── Calcular coalición dinámica ─────────────────────────────────────────
+    CLAUDIA_VOTOS = 225_335
+
+    mun_coal = mun.copy()
+    mun_coal["votos_ae_coal"] = mun_coal["votos_AE"].copy()
+    mun_coal["votos_ic_coal"] = mun_coal["votos_IC"].copy()
+
+    if apoyo_valencia == "→ Abelardo":
+        mun_coal["votos_ae_coal"] += mun_coal["votos_Valencia"]
+    elif apoyo_valencia == "→ Cepeda":
+        mun_coal["votos_ic_coal"] += mun_coal["votos_Valencia"]
+
+    if apoyo_fajardo == "→ Abelardo":
+        mun_coal["votos_ae_coal"] += mun_coal["votos_Fajardo"]
+    elif apoyo_fajardo == "→ Cepeda":
+        mun_coal["votos_ic_coal"] += mun_coal["votos_Fajardo"]
+
+    mun_coal["diff_coal"]    = mun_coal["votos_ae_coal"] - mun_coal["votos_ic_coal"]
+    mun_coal["gana_ae_solo"] = (mun_coal["votos_AE"] > mun_coal["votos_IC"]).astype(int)
+    mun_coal["gana_coal"]    = (mun_coal["votos_ae_coal"] > mun_coal["votos_ic_coal"]).astype(int)
+
+    # Totales nacionales (Claudia se suma solo a nivel nacional)
+    ae_nac = int(mun_coal["votos_ae_coal"].sum())
+    ic_nac = int(mun_coal["votos_ic_coal"].sum())
+    if apoyo_claudia == "→ Abelardo":
+        ae_nac += CLAUDIA_VOTOS
+    elif apoyo_claudia == "→ Cepeda":
+        ic_nac += CLAUDIA_VOTOS
+
+    total_ae        = int(mun["votos_AE"].sum())
+    total_ic        = int(mun["votos_IC"].sum())
+    munis_gana_ae   = int(mun_coal["gana_ae_solo"].sum())
+    munis_gana_coal = int(mun_coal["gana_coal"].sum())
+    n_coal          = len(mun_coal)
+    ganados_extra   = munis_gana_coal - munis_gana_ae
+
+    # ── Totales nacionales (al tope, visual y destacado) ────────────────────
+    st.subheader("Totales nacionales – Escenario coalición")
+    _diff_nac = ae_nac - ic_nac
+    _ganador_label = "ABELARDO GANA" if _diff_nac > 0 else "CEPEDA GANA"
+    _ganador_color = "#1f77b4" if _diff_nac > 0 else "#CC0000"
+
+    tot_c1, tot_c2, tot_c3 = st.columns(3)
+    tot_c1.metric(
+        "Abelardo (con coalición)",
+        f"{ae_nac:,}",
+        f"+{ae_nac - total_ae:,} vs solo",
+    )
+    tot_c2.metric(
+        "Cepeda",
+        f"{ic_nac:,}",
+    )
+    tot_c3.metric(
+        "Diferencia",
+        f"{abs(_diff_nac):,}",
+        _ganador_label,
+        delta_color="normal" if _diff_nac > 0 else "inverse",
+    )
+
+    # Barra comparativa AE vs IC
+    fig_tot = px.bar(
+        pd.DataFrame({
+            "Candidato": ["Abelardo (coalición)", "Cepeda"],
+            "Votos":     [ae_nac, ic_nac],
+            "Color":     ["ABELARDO DE LA ESPRIELLA", "IVÁN CEPEDA CASTRO"],
+        }),
+        x="Votos", y="Candidato", orientation="h",
+        color="Color", color_discrete_map=COLORS,
+        text=pd.Series([ae_nac, ic_nac]).apply(lambda v: f"{v:,.0f}"),
+    )
+    fig_tot.update_traces(textposition="outside", cliponaxis=False)
+    fig_tot.update_layout(
+        showlegend=False, height=150,
+        margin=dict(l=0, r=180, t=4, b=4),
+        xaxis={"autorange": True},
+        yaxis={"categoryorder": "total ascending"},
+    )
+    st.plotly_chart(fig_tot, use_container_width=True)
+
+    st.divider()
+
+    # ── Métricas de municipios ───────────────────────────────────────────────
+    c1, c2, c3 = st.columns(3)
+    c1.metric("AE gana solo",
+              f"{munis_gana_ae:,} / {n_coal:,} municipios",
+              f"{munis_gana_ae/n_coal*100:.0f}%")
+    c2.metric("AE con coalición",
+              f"{munis_gana_coal:,} / {n_coal:,} municipios",
+              f"{munis_gana_coal/n_coal*100:.0f}%", delta_color="normal")
+    c3.metric("Municipios que suma coalición",
+              f"+{ganados_extra:,}" if ganados_extra >= 0 else f"{ganados_extra:,}")
+
+    st.divider()
+
+    # ── Diferencia por departamento ──────────────────────────────────────────
+    st.subheader("Diferencia votos: coalición AE – Cepeda por departamento")
+    st.caption("Verde = coalición gana el departamento  |  Rojo = Cepeda gana")
+
+    mun_coal_int = mun_coal[mun_coal["dept_nombre"] != "CONSULADOS"]
+    dept_coal = (mun_coal_int.groupby("dept_nombre", as_index=False)
+                    .agg(
+                        votos_AE=("votos_AE", "sum"),
+                        votos_IC=("votos_IC", "sum"),
+                        votos_ae_coal=("votos_ae_coal", "sum"),
+                        votos_ic_coal=("votos_ic_coal", "sum"),
+                        votos_Valencia=("votos_Valencia", "sum"),
+                        votos_Fajardo=("votos_Fajardo", "sum"),
+                    ))
+    dept_coal["diff_coal"]    = dept_coal["votos_ae_coal"] - dept_coal["votos_ic_coal"]
+    dept_coal["ganador_coal"] = dept_coal["diff_coal"].apply(
+        lambda d: "COALICIÓN AE" if d > 0 else "CEPEDA"
+    )
+    dept_coal = dept_coal.sort_values("diff_coal", ascending=False)
+
+    fig_dept = px.bar(
+        dept_coal, x="diff_coal", y="dept_nombre",
+        color="ganador_coal",
+        color_discrete_map={"COALICIÓN AE": "#2ca02c", "CEPEDA": "#CC0000"},
+        orientation="h",
+        labels={"diff_coal": "Diferencia (coalición AE – Cepeda)",
+                "dept_nombre": "", "ganador_coal": ""},
+        hover_data={
+            "votos_AE": ":,", "votos_IC": ":,",
+            "votos_Valencia": ":,", "votos_Fajardo": ":,",
+            "votos_ae_coal": ":,", "votos_ic_coal": ":,",
+        },
+    )
+    fig_dept.add_vline(x=0, line_dash="solid", line_color="black", line_width=1)
+    fig_dept.update_layout(
+        height=700, showlegend=True,
+        margin=dict(l=0, r=10, t=10, b=0),
+        yaxis={"categoryorder": "total ascending"},
+    )
+    st.plotly_chart(fig_dept, use_container_width=True)
+
+    # ── Municipios revertidos ────────────────────────────────────────────────
+    st.subheader("Municipios donde la coalición revierte el resultado")
+
+    if sel_dept == EXTERIOR_LABEL:
+        mun_coal_f = mun_coal[mun_coal["dept_nombre"] == "CONSULADOS"]
+    elif sel_dept != "Todos":
+        mun_coal_f = mun_coal[mun_coal["dept_nombre"] == sel_dept]
+    else:
+        mun_coal_f = mun_coal[mun_coal["dept_nombre"] != "CONSULADOS"]
+
+    revertidos = mun_coal_f[
+        (mun_coal_f["gana_ae_solo"] == 0) & (mun_coal_f["gana_coal"] == 1)
+    ][["dept_nombre", "muni_nombre", "votos_AE", "votos_IC",
+       "votos_Valencia", "votos_Fajardo", "votos_ae_coal", "diff_coal"]].copy()
+
+    st.metric("Municipios revertidos por coalición", f"{len(revertidos):,}")
+
+    if not revertidos.empty:
+        revertidos = revertidos.sort_values("diff_coal", ascending=False)
+        for c in ["votos_AE", "votos_IC", "votos_Valencia", "votos_Fajardo", "votos_ae_coal"]:
+            revertidos[c] = revertidos[c].apply(lambda v: f"{v:,.0f}")
+        revertidos["diff_coal"] = revertidos["diff_coal"].apply(lambda v: f"{v:+,.0f}")
+        st.dataframe(revertidos.reset_index(drop=True),
+                     use_container_width=True, hide_index=True)
+
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TAB 6 – PROYECCIÓN 2ª VUELTA
+# ═══════════════════════════════════════════════════════════════════════════════
+with t6:
+    st.title("Proyección Segunda Vuelta")
+
+    st.markdown("""
+    Modelo de transferencia de votos basado en ideología y endorsements observados.
+    Ajusta las tasas para ver cómo cambia el resultado.
+    """)
+
+    v1 = {
+        "PALOMA VALENCIA LASERNA":   1_637_665,
+        "SERGIO FAJARDO VALDERRAMA": 1_007_943,
+        "CLAUDIA LÓPEZ":               225_335,
+        "OTROS":                       150_000,
+    }
+    ae_base = 10_346_212
+    ic_base  =  9_682_199
+
+    st.subheader("Tasas de transferencia (ajustables)")
+    st.button("Restablecer a estimación base", on_click=_reset_proyeccion)
+    cols = st.columns(4)
+    fuentes = list(v1.keys())
+
+    # Defaults: AE + IC + ABS = 100 en cada fila
+    defaults_ae  = {"PALOMA VALENCIA LASERNA": 72, "SERGIO FAJARDO VALDERRAMA": 22,
+                    "CLAUDIA LÓPEZ": 10, "OTROS": 35}
+    defaults_ic  = {"PALOMA VALENCIA LASERNA":  6, "SERGIO FAJARDO VALDERRAMA": 48,
+                    "CLAUDIA LÓPEZ": 58, "OTROS": 35}
+    defaults_abs = {"PALOMA VALENCIA LASERNA": 22, "SERGIO FAJARDO VALDERRAMA": 30,
+                    "CLAUDIA LÓPEZ": 32, "OTROS": 30}
+
+    # Inicializar session_state con defaults solo si no existen aún
+    for fuente in fuentes:
+        for key, val in [(f"ae_{fuente}",  defaults_ae[fuente]),
+                         (f"ic_{fuente}",  defaults_ic[fuente]),
+                         (f"abs_{fuente}", defaults_abs[fuente])]:
+            if key not in st.session_state:
+                st.session_state[key] = val
+
+    taus = {}
+    for i, fuente in enumerate(fuentes):
+        with cols[i]:
+            label = fuente.split()[0]
+            st.markdown(f"**{label}**")
+            total_fuente = v1[fuente]
+            st.caption(f"{total_fuente:,} votos disponibles")
+
+            # AE: libre 0-100
+            t_ae = st.slider("→ AE %", 0, 100, key=f"ae_{fuente}")
+
+            # IC: clampeado al espacio restante tras AE
+            max_ic = 100 - t_ae
+            if st.session_state[f"ic_{fuente}"] > max_ic:
+                st.session_state[f"ic_{fuente}"] = max_ic
+            if max_ic > 0:
+                t_ic = st.slider("→ IC %", 0, max_ic, key=f"ic_{fuente}")
+            else:
+                st.session_state[f"ic_{fuente}"] = 0
+                t_ic = 0
+                st.caption("→ IC %: **0%** (AE ocupa el 100%)")
+
+            # ABS: clampeado al espacio restante tras AE+IC
+            max_abs = 100 - t_ae - t_ic
+            if st.session_state[f"abs_{fuente}"] > max_abs:
+                st.session_state[f"abs_{fuente}"] = max_abs
+            if max_abs > 0:
+                t_abs = st.slider("→ Abstención %", 0, max_abs, key=f"abs_{fuente}")
+            else:
+                st.session_state[f"abs_{fuente}"] = 0
+                t_abs = 0
+                st.caption("→ Abstención %: **0%** (AE+IC ocupan el 100%)")
+
+            restante  = 100 - t_ae - t_ic - t_abs
+            votos_ae  = int(total_fuente * t_ae  / 100)
+            votos_ic  = int(total_fuente * t_ic  / 100)
+            votos_abs = int(total_fuente * t_abs / 100)
+            votos_nr  = int(total_fuente * restante / 100)
+
+            st.caption(
+                f"AE: **{votos_ae:,}**  ·  IC: **{votos_ic:,}**  ·  "
+                f"Abs: **{votos_abs:,}**"
+                + (f"  ·  Sin asignar: {restante}% ({votos_nr:,})" if restante else "")
+            )
+            taus[fuente] = (t_ae / 100, t_ic / 100, t_abs / 100)
+
+    ae_extra = sum(v1[f] * taus[f][0] for f in fuentes)
+    ic_extra = sum(v1[f] * taus[f][1] for f in fuentes)
+    ae_total = ae_base + ae_extra
+    ic_total = ic_base + ic_extra
+    total    = ae_total + ic_total
+    ae_pct   = ae_total / total * 100
+    ic_pct   = ic_total / total * 100
+
+    st.divider()
+    st.subheader("Resultado proyectado")
+
+    ganador   = "ABELARDO DE LA ESPRIELLA" if ae_total > ic_total else "IVÁN CEPEDA CASTRO"
+    margen    = abs(ae_total - ic_total)
+    win_color = "#1f77b4" if ae_total > ic_total else "#CC0000"
+
+    st.markdown(
+        f"""<div style="background:{win_color}; padding:16px 24px; border-radius:10px;
+                        color:white; font-size:1.25em; font-weight:600; margin-bottom:12px;">
+            GANA: {ganador} &nbsp;&nbsp;|&nbsp;&nbsp;
+            Margen: {margen:,.0f} votos &nbsp;&nbsp;|&nbsp;&nbsp;
+            AE {ae_pct:.1f}% &nbsp;–&nbsp; IC {ic_pct:.1f}%
+        </div>""",
+        unsafe_allow_html=True,
+    )
+
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("ABELARDO – 1ª Vuelta",  f"{ae_base:,}")
+    c2.metric("ABELARDO – Votos extra", f"+{int(ae_extra):,}")
+    c3.metric("CEPEDA – 1ª Vuelta",    f"{ic_base:,}")
+    c4.metric("CEPEDA – Votos extra",   f"+{int(ic_extra):,}")
+
+    c5, c6 = st.columns(2)
+    c5.metric("ABELARDO TOTAL", f"{ae_total:,.0f}", f"{ae_pct:.1f}%")
+    c6.metric("CEPEDA TOTAL",   f"{ic_total:,.0f}", f"{ic_pct:.1f}%")
+
+    fig = go.Figure()
+    fig.add_bar(name="Primera vuelta",
+                x=["ABELARDO", "CEPEDA"],
+                y=[ae_base, ic_base],
+                marker_color=["#1f77b4", "#CC0000"], opacity=0.5)
+    fig.add_bar(name="Segunda vuelta proyectada",
+                x=["ABELARDO", "CEPEDA"],
+                y=[ae_total, ic_total],
+                marker_color=["#1f77b4", "#CC0000"], opacity=1.0)
+    fig.update_layout(barmode="group", height=400,
+                      yaxis_title="Votos",
+                      title="Primera vs Segunda Vuelta (proyección)")
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.subheader("Detalle de transferencias")
+    rows = []
+    for f in fuentes:
+        t_ae, t_ic, t_abs = taus[f]
+        rows.append({
+            "Fuente":       f,
+            "Votos 1ª":     f"{v1[f]:,}",
+            "→ AE":         f"{v1[f]*t_ae:,.0f}  ({t_ae*100:.0f}%)",
+            "→ IC":         f"{v1[f]*t_ic:,.0f}  ({t_ic*100:.0f}%)",
+            "Abstención":   f"{v1[f]*t_abs:,.0f}  ({t_abs*100:.0f}%)",
+        })
+    rows.append({
+        "Fuente":     "TOTAL EXTRA",
+        "Votos 1ª":   f"{sum(v1.values()):,}",
+        "→ AE":       f"{ae_extra:,.0f}",
+        "→ IC":       f"{ic_extra:,.0f}",
+        "Abstención": "",
+    })
+    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TAB 7 – SOLO ANTIOQUIA
+# ═══════════════════════════════════════════════════════════════════════════════
+with t7:
+    st.title("Análisis Detallado – Antioquia")
+
+    ant = mun[mun["dept_co"] == 1].copy()
+    ant_df = df[df["dept_co"] == 1].copy()
+
+    if ant.empty:
+        st.warning("No hay datos de Antioquia.")
+    else:
+        # Métricas
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Municipios",        f"{len(ant):,}")
+        c2.metric("Total votantes",    f"{ant['total_votantes'].sum():,}")
+        c3.metric("Votos AE",          f"{ant['votos_AE'].sum():,}")
+        c4.metric("Votos IC",          f"{ant['votos_IC'].sum():,}")
+
+        munis_ae_ant = (ant["gana_AE"] == 1).sum()
+        munis_ic_ant = (ant["gana_AE"] == 0).sum()
+        c5, c6, c7 = st.columns(3)
+        c5.metric("Municipios ganados AE",
+                  f"{munis_ae_ant} / {len(ant)}",
+                  f"{munis_ae_ant/len(ant)*100:.0f}%")
+        c6.metric("Municipios ganados IC",
+                  f"{munis_ic_ant} / {len(ant)}",
+                  f"{munis_ic_ant/len(ant)*100:.0f}%")
+        diff_total = int(ant["votos_AE"].sum() - ant["votos_IC"].sum())
+        c7.metric("Diferencia AE – IC", f"{diff_total:+,}",
+                  "AE gana" if diff_total > 0 else "IC gana")
+
+        st.divider()
+
+        # ── Mapa municipal Antioquia ─────────────────────────────────────────
+        st.subheader("Mapa: ganador por municipio – Antioquia")
+
+        ant_map = ant[ant["divipola_muni"] != ""].copy()
+        fig_ant_map = px.choropleth(
+            ant_map,
+            geojson=geo_ant,
+            locations="divipola_muni",
+            featureidkey="properties.MPIO_CCNCT",
+            color="ganador",
+            color_discrete_map=GANADOR_COLORS,
+            hover_name="muni_nombre",
+            hover_data={
+                "votos_AE": ":,",
+                "votos_IC": ":,",
+                "diff_AE_IC": ":,",
+                "pct_AE": ":.1f",
+                "pct_IC": ":.1f",
+                "divipola_muni": False,
+            },
+            labels={"ganador": "Ganador", "diff_AE_IC": "Diferencia AE−IC",
+                    "pct_AE": "% AE", "pct_IC": "% IC"},
+        )
+        fig_ant_map.update_geos(fitbounds="locations", visible=False)
+        fig_ant_map.update_layout(
+            height=640, margin=dict(l=0, r=0, t=0, b=0),
+            paper_bgcolor="rgba(0,0,0,0)",
+            geo=dict(
+                bgcolor="rgba(0,0,0,0)",
+                showframe=False,
+                showcoastlines=False,
+            ),
+        )
+        st.plotly_chart(fig_ant_map, use_container_width=True)
+
+        # ── Barra: municipios por % AE, coloreados por ganador ──────────────
+        st.subheader("Todos los municipios de Antioquia – % AE vs % IC")
+        ant_plot = ant.sort_values("pct_AE", ascending=False).copy()
+
+        fig_ant = go.Figure()
+        fig_ant.add_bar(
+            x=ant_plot["muni_nombre"],
+            y=ant_plot["pct_AE"],
+            name="% AE",
+            marker_color="#1f77b4",
+            hovertemplate="%{x}<br>AE: %{y:.1f}%<extra></extra>",
+        )
+        fig_ant.add_bar(
+            x=ant_plot["muni_nombre"],
+            y=ant_plot["pct_IC"],
+            name="% IC",
+            marker_color="#CC0000",
+            hovertemplate="%{x}<br>IC: %{y:.1f}%<extra></extra>",
+        )
+        fig_ant.update_layout(
+            barmode="group",
+            height=500,
+            xaxis_tickangle=-60,
+            xaxis={"tickfont": {"size": 8}},
+            legend_title="Candidato",
+            yaxis_title="% Votos",
+            margin=dict(b=140),
+        )
+        st.plotly_chart(fig_ant, use_container_width=True)
+
+        # ── Top municipios AE vs IC ──────────────────────────────────────────
+        col_a, col_b = st.columns(2)
+        with col_a:
+            st.subheader("Mejores municipios de AE en Antioquia")
+            top_ae = ant.nlargest(20, "pct_AE")[
+                ["muni_nombre", "votos_AE", "pct_AE", "pct_IC", "diff_AE_IC"]
+            ].reset_index(drop=True)
+            fig_ta = px.bar(
+                top_ae.sort_values("pct_AE", ascending=True),
+                x="pct_AE", y="muni_nombre", orientation="h",
+                color_discrete_sequence=["#1f77b4"],
+                labels={"pct_AE": "% AE", "muni_nombre": ""},
+            )
+            fig_ta.update_layout(height=500, margin=dict(l=0, r=20, t=10, b=0),
+                                 yaxis={"categoryorder": "total ascending"})
+            st.plotly_chart(fig_ta, use_container_width=True)
+
+        with col_b:
+            st.subheader("Mejores municipios de IC en Antioquia")
+            top_ic = ant.nlargest(20, "pct_IC")[
+                ["muni_nombre", "votos_IC", "pct_IC", "pct_AE", "diff_AE_IC"]
+            ].reset_index(drop=True)
+            fig_ti = px.bar(
+                top_ic.sort_values("pct_IC", ascending=True),
+                x="pct_IC", y="muni_nombre", orientation="h",
+                color_discrete_sequence=["#CC0000"],
+                labels={"pct_IC": "% IC", "muni_nombre": ""},
+            )
+            fig_ti.update_layout(height=500, margin=dict(l=0, r=20, t=10, b=0),
+                                 yaxis={"categoryorder": "total ascending"})
+            st.plotly_chart(fig_ti, use_container_width=True)
+
+        # ── Scatter AE vs IC en Antioquia ─────────────────────────────────
+        st.subheader("% AE vs % IC por municipio (Antioquia)")
+        fig_sc = px.scatter(
+            ant, x="pct_AE", y="pct_IC",
+            hover_name="muni_nombre",
+            hover_data={"votos_AE": ":,", "votos_IC": ":,"},
+            color="ganador",
+            color_discrete_map=GANADOR_COLORS,
+            labels={"pct_AE": "% Abelardo", "pct_IC": "% Cepeda", "ganador": "Ganador"},
+            opacity=0.75,
+            size="votos_AE",
+        )
+        fig_sc.add_shape(
+            type="line", x0=0, y0=0, x1=100, y1=100,
+            line=dict(dash="dash", color="gray", width=1),
+        )
+        add_trend(fig_sc, ant["pct_AE"], ant["pct_IC"], name="Tendencia")
+        fig_sc.update_layout(height=450)
+        st.plotly_chart(fig_sc, use_container_width=True)
+
+        # ── Tabla coalición Antioquia ─────────────────────────────────────
+        st.subheader("Conversión con coalición – Antioquia")
+        st.caption("Muestra si sumar a Paloma + Fajardo a AE cambia el resultado municipio a municipio")
+
+        coal_ant = ant[[
+            "muni_nombre", "votos_AE", "votos_IC", "votos_Valencia",
+            "votos_Fajardo", "votos_coalicion_AE",
+            "diff_AE_IC", "diff_coalicion_IC", "gana_AE", "gana_coalicion",
+        ]].sort_values("diff_AE_IC", ascending=True).reset_index(drop=True).copy()
+
+        coal_ant["Conversión"] = coal_ant.apply(
+            lambda r: "Revierte" if (r["gana_AE"] == 0 and r["gana_coalicion"] == 1)
+                      else ("Mantiene" if r["gana_AE"] == 1 else "Sin cambio"),
+            axis=1,
+        )
+
+        for c in ["votos_AE", "votos_IC", "votos_Valencia",
+                  "votos_Fajardo", "votos_coalicion_AE"]:
+            coal_ant[c] = coal_ant[c].apply(lambda v: f"{v:,.0f}")
+        coal_ant["diff_AE_IC"]       = coal_ant["diff_AE_IC"].apply(lambda v: f"{v:+,.0f}")
+        coal_ant["diff_coalicion_IC"] = coal_ant["diff_coalicion_IC"].apply(lambda v: f"{v:+,.0f}")
+
+        coal_ant = coal_ant.drop(columns=["gana_AE", "gana_coalicion"])
+        coal_ant.columns = [
+            "Municipio", "V. AE", "V. IC", "V. Paloma", "V. Fajardo",
+            "V. Coalición", "Dif AE–IC", "Dif Coal–IC", "Resultado",
+        ]
+        st.dataframe(coal_ant, use_container_width=True, hide_index=True)
+
+        # ── Tabla completa ────────────────────────────────────────────────
+        st.subheader("Tabla completa – Antioquia")
+        tabla_ant = ant[[
+            "muni_nombre", "total_votantes", "votos_AE", "pct_AE",
+            "votos_IC", "pct_IC", "votos_Valencia", "votos_Fajardo",
+            "diff_AE_IC", "ganador",
+        ]].sort_values("votos_AE", ascending=False).reset_index(drop=True).copy()
+
+        tabla_ant["total_votantes"]  = tabla_ant["total_votantes"].apply(lambda v: f"{v:,.0f}")
+        tabla_ant["votos_AE"]        = tabla_ant["votos_AE"].apply(lambda v: f"{v:,.0f}")
+        tabla_ant["votos_IC"]        = tabla_ant["votos_IC"].apply(lambda v: f"{v:,.0f}")
+        tabla_ant["votos_Valencia"]  = tabla_ant["votos_Valencia"].apply(lambda v: f"{v:,.0f}")
+        tabla_ant["votos_Fajardo"]   = tabla_ant["votos_Fajardo"].apply(lambda v: f"{v:,.0f}")
+        tabla_ant["pct_AE"]          = tabla_ant["pct_AE"].apply(lambda v: f"{v:.1f}%")
+        tabla_ant["pct_IC"]          = tabla_ant["pct_IC"].apply(lambda v: f"{v:.1f}%")
+        tabla_ant["diff_AE_IC"]      = tabla_ant["diff_AE_IC"].apply(lambda v: f"{v:+,.0f}")
+        tabla_ant.columns = [
+            "Municipio", "Votantes", "Votos AE", "% AE",
+            "Votos IC", "% IC", "Votos Paloma", "Votos Fajardo",
+            "Dif AE-IC", "Ganador",
+        ]
+        st.dataframe(tabla_ant, use_container_width=True, hide_index=True)
