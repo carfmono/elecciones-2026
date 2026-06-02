@@ -30,13 +30,13 @@ st.markdown("""
     left: 0;
     right: 0;
     z-index: 999992;
-    background-color: var(--background-color, white) !important;
+    background-color: #ffffff !important;
     backdrop-filter: none !important;
     text-align: center;
     padding: 5px 16px;
     font-size: 1.2rem;
     font-weight: 700;
-    color: var(--text-color);
+    color: #262730;
     letter-spacing: 0.02em;
     border-bottom: 1px solid rgba(128, 128, 128, 0.25);
     line-height: 1.3;
@@ -49,7 +49,7 @@ div[data-testid="stTabs"] div[role="tablist"] {
     left: 0 !important;
     right: 0 !important;
     z-index: 999990 !important;
-    background-color: var(--background-color, white) !important;
+    background-color: #ffffff !important;
     backdrop-filter: none !important;
     padding: 4px 16px !important;
     border-bottom: 1px solid rgba(128, 128, 128, 0.2) !important;
@@ -70,7 +70,7 @@ div[data-testid="stTabsContent"] h2,
 div[data-testid="stTabsContent"] h3 {
     position: relative;
     z-index: 1;
-    background-color: var(--background-color, white) !important;
+    background-color: #ffffff !important;
     padding-top: 8px !important;
     padding-bottom: 4px !important;
     margin-top: 0 !important;
