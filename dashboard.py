@@ -456,6 +456,9 @@ def _muni_label(row: pd.Series) -> str:
 
 mun_f["muni_label"] = mun_f.apply(_muni_label, axis=1)
 
+# Config para mapas estáticos (sin zoom ni pan, sin barra de herramientas)
+_MAP_CFG = {"scrollZoom": False, "doubleClick": False, "displayModeBar": False}
+
 
 # ── Callback para restablecer sliders de Proyección ───────────────────────────
 def _reset_proyeccion() -> None:
@@ -636,8 +639,9 @@ with t1:
         height=500, margin=dict(l=0, r=0, t=0, b=0),
         paper_bgcolor="rgba(0,0,0,0)",
         geo=dict(bgcolor="rgba(0,0,0,0)"),
+        dragmode=False,
     )
-    st.plotly_chart(fig_map, use_container_width=True)
+    st.plotly_chart(fig_map, use_container_width=True, config=_MAP_CFG)
 
     # ── Tabla con dptos ganados ──────────────────────────────────────────────
     st.subheader("Tabla de resultados")
@@ -789,6 +793,7 @@ with t1:
             height=420, margin=dict(l=0, r=0, t=0, b=0),
             paper_bgcolor="rgba(0,0,0,0)",
             template=_PLOTLY_TPL,
+            dragmode=False,
             geo=dict(
                 bgcolor="rgba(0,0,0,0)",
                 showframe=False,
@@ -800,7 +805,7 @@ with t1:
                 showland=True,
             ),
         )
-        st.plotly_chart(fig_world, use_container_width=True)
+        st.plotly_chart(fig_world, use_container_width=True, config=_MAP_CFG)
     else:
         st.caption("No se pudo mapear países desde los nombres de consulados.")
 
@@ -882,8 +887,9 @@ with t2:
             height=420, margin=dict(l=0, r=0, t=30, b=0),
             paper_bgcolor="rgba(0,0,0,0)",
             geo=dict(bgcolor="rgba(0,0,0,0)"),
+            dragmode=False,
         )
-        st.plotly_chart(fig_ae, use_container_width=True)
+        st.plotly_chart(fig_ae, use_container_width=True, config=_MAP_CFG)
 
     with col_mb:
         ic_dept = dept_agg2[dept_agg2["candidato_presidente"] == "IVÁN CEPEDA CASTRO"].copy()
@@ -906,8 +912,9 @@ with t2:
             height=420, margin=dict(l=0, r=0, t=30, b=0),
             paper_bgcolor="rgba(0,0,0,0)",
             geo=dict(bgcolor="rgba(0,0,0,0)"),
+            dragmode=False,
         )
-        st.plotly_chart(fig_ic, use_container_width=True)
+        st.plotly_chart(fig_ic, use_container_width=True, config=_MAP_CFG)
 
     # ── Mapa municipal: ganador por municipio ───────────────────────────────
     st.subheader("Mapa: ganador por municipio")
@@ -938,8 +945,9 @@ with t2:
         height=620, margin=dict(l=0, r=0, t=0, b=0),
         paper_bgcolor="rgba(0,0,0,0)",
         geo=dict(bgcolor="rgba(0,0,0,0)"),
+        dragmode=False,
     )
-    st.plotly_chart(fig_muni, use_container_width=True)
+    st.plotly_chart(fig_muni, use_container_width=True, config=_MAP_CFG)
 
     # Participación promedio
     st.subheader("Participación promedio por departamento")
@@ -1486,13 +1494,14 @@ with t7:
         fig_ant_map.update_layout(
             height=640, margin=dict(l=0, r=0, t=0, b=0),
             paper_bgcolor="rgba(0,0,0,0)",
+            dragmode=False,
             geo=dict(
                 bgcolor="rgba(0,0,0,0)",
                 showframe=False,
                 showcoastlines=False,
             ),
         )
-        st.plotly_chart(fig_ant_map, use_container_width=True)
+        st.plotly_chart(fig_ant_map, use_container_width=True, config=_MAP_CFG)
 
         # ── Barra: municipios por % AE, coloreados por ganador ──────────────
         st.subheader("Todos los municipios de Antioquia – % AE vs % IC")
