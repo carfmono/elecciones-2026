@@ -1824,8 +1824,18 @@ with t_proyeccion:
         ("Resultado 1ª vuelta", "2026-05-31", 43.74, 40.90, "Resultado oficial Registraduría"),
     ]
     _poll_df = pd.DataFrame(_POLLS_TS, columns=["Firma", "Fecha", "AE%", "IC%", "Nota"])
-    _poll_df["Fecha"] = pd.to_datetime(_poll_df["Fecha"])
-    _poll_df["Margen"] = _poll_df["AE%"] - _poll_df["IC%"]
+    _poll_df["Fecha"]     = pd.to_datetime(_poll_df["Fecha"])
+    _poll_df["Mes"]       = _poll_df["Fecha"].dt.strftime("%b %Y")   # "Abr 2026", "May 2026", "Jun 2026"
+    _poll_df["Mes_orden"] = _poll_df["Fecha"].dt.to_period("M").apply(lambda p: p.ordinal)
+    _poll_df["Margen"]    = _poll_df["AE%"] - _poll_df["IC%"]
+
+    # Para la serie mensual: si una firma tiene varias encuestas en el mismo mes, promedio
+    _poll_monthly = (
+        _poll_df.groupby(["Firma", "Mes", "Mes_orden"], as_index=False)
+        .agg({"AE%": "mean", "IC%": "mean", "Margen": "mean"})
+        .sort_values("Mes_orden")
+    )
+    _MES_ORDER = _poll_monthly["Mes"].drop_duplicates().sort_values().tolist()
 
     # Colores por firma
     _FIRMA_COLORS = {
@@ -1841,70 +1851,57 @@ with t_proyeccion:
 
     # ── Serie de tiempo: AE% y IC% por encuestadora ──────────────────────────
     _fig_ts = go.Figure()
-    for firma, grp in _poll_df.groupby("Firma", sort=False):
-        grp = grp.sort_values("Fecha")
+    for firma, grp in _poll_monthly.groupby("Firma", sort=False):
+        grp = grp.sort_values("Mes_orden")
         color = _FIRMA_COLORS.get(firma, "#aaaaaa")
         dash  = _FIRMA_DASH.get(firma, "solid")
         sym   = "diamond" if firma == "Resultado 1ª vuelta" else "circle"
         _fig_ts.add_trace(go.Scatter(
-            x=grp["Fecha"], y=grp["AE%"],
+            x=grp["Mes"], y=grp["AE%"],
             mode="lines+markers+text",
-            name=f"{firma} – AE",
+            name=f"{firma}",
             line=dict(color=color, dash=dash, width=2),
             marker=dict(color=color, size=9, symbol=sym),
             text=grp["AE%"].apply(lambda v: f"{v:.1f}"),
             textposition="top center",
             legendgroup=firma,
-            hovertemplate=f"<b>{firma}</b><br>%{{x|%d %b}}<br>AE: %{{y:.1f}}%<br><extra></extra>",
-        ))
-        _fig_ts.add_trace(go.Scatter(
-            x=grp["Fecha"], y=grp["IC%"],
-            mode="lines+markers+text",
-            name=f"{firma} – IC",
-            line=dict(color=color, dash="dash" if dash == "solid" else "dot", width=1.5),
-            marker=dict(color=color, size=7, symbol=sym, opacity=0.6),
-            text=grp["IC%"].apply(lambda v: f"{v:.1f}"),
-            textposition="bottom center",
-            legendgroup=firma,
-            showlegend=True,
-            hovertemplate=f"<b>{firma}</b><br>%{{x|%d %b}}<br>IC: %{{y:.1f}}%<br><extra></extra>",
+            hovertemplate=f"<b>{firma}</b><br>Abelardo: %{{y:.1f}}%<extra></extra>",
         ))
 
     _fig_ts.add_hline(y=50, line_dash="dot", line_color="#C8A96E",
                       annotation_text="50% mayoría", annotation_position="top right")
     _fig_ts.update_layout(
-        height=480,
-        title="Intención de voto 2ª vuelta – Serie de tiempo por encuestadora",
-        xaxis_title="", yaxis_title="% intención de voto",
-        yaxis_range=[35, 58],
-        xaxis=dict(tickformat="%d %b", dtick="M0.5"),
+        height=420,
+        title="Abelardo De La Espriella – intención de voto 2ª vuelta por encuestadora",
+        xaxis=dict(categoryorder="array", categoryarray=_MES_ORDER, title=""),
+        yaxis=dict(title="% intención de voto", range=[35, 58]),
         legend=dict(orientation="h", yanchor="bottom", y=-0.35, xanchor="left", x=0, font_size=10),
         margin=dict(t=50, b=120),
     )
     st.plotly_chart(_fig_ts, use_container_width=True)
 
-    # ── Margen AE-IC por encuestadora en el tiempo ────────────────────────────
-    st.subheader("Margen AE − IC en el tiempo (pp)")
+    # ── Margen AE-IC por encuestadora mensual ─────────────────────────────────
+    st.subheader("Margen AE − IC por mes (pp)")
     _fig_margen = go.Figure()
-    for firma, grp in _poll_df.groupby("Firma", sort=False):
-        grp = grp.sort_values("Fecha")
+    for firma, grp in _poll_monthly.groupby("Firma", sort=False):
+        grp = grp.sort_values("Mes_orden")
         color = _FIRMA_COLORS.get(firma, "#aaaaaa")
         sym   = "diamond" if firma == "Resultado 1ª vuelta" else "circle"
         _fig_margen.add_trace(go.Scatter(
-            x=grp["Fecha"], y=grp["Margen"],
+            x=grp["Mes"], y=grp["Margen"],
             mode="lines+markers+text",
             name=firma,
             line=dict(color=color, width=2),
             marker=dict(color=color, size=10, symbol=sym),
             text=grp["Margen"].apply(lambda v: f"{v:+.1f}"),
             textposition="top center",
-            hovertemplate=f"<b>{firma}</b><br>%{{x|%d %b}}<br>Margen: %{{y:+.1f}} pp<extra></extra>",
+            hovertemplate=f"<b>{firma}</b><br>Margen Abelardo−Cepeda: %{{y:+.1f}} pp<extra></extra>",
         ))
     _fig_margen.add_hline(y=0, line_dash="dash", line_color="#555555",
                           annotation_text="Empate", annotation_position="right")
     _fig_margen.update_layout(
         height=320,
-        xaxis=dict(tickformat="%d %b"),
+        xaxis=dict(categoryorder="array", categoryarray=_MES_ORDER, title=""),
         yaxis_title="pp (+ = AE lidera)",
         legend=dict(orientation="h", yanchor="bottom", y=-0.4, xanchor="left", x=0, font_size=10),
         margin=dict(t=20, b=100),
