@@ -1827,21 +1827,6 @@ with t_proyeccion:
     _poll_df["IC% norm"] = 100 - _poll_df["AE% norm"]
     _poll_df["Margen AE-IC"] = (_poll_df["AE%"] - _poll_df["IC%"]).round(1).apply(lambda v: f"{v:+.1f} pp")
 
-    # Promedio simple y ponderado de las encuestas post-1ª vuelta
-    _post = _poll_df[_poll_df["Fecha"].str.contains("jun")]
-    _prom_ae_norm = _poll_df["AE% norm"].mean()
-    _prom_ic_norm = _poll_df["IC% norm"].mean()
-
-    # Tabla resumen
-    _display = _poll_df[["Firma","Fecha","AE%","IC%","Otros/NS%","Margen AE-IC","Nota"]].copy()
-    _display.loc[len(_display)] = ["**PROMEDIO ENCUESTAS**", "—",
-                                    round(_poll_df["AE%"].mean(),1),
-                                    round(_poll_df["IC%"].mean(),1),
-                                    round(_poll_df["Otros/NS%"].mean(),1),
-                                    f"{round(_poll_df['AE%'].mean()-_poll_df['IC%'].mean(),1):+.1f} pp",
-                                    "Promedio simple de todas las encuestas"]
-    st.dataframe(_display, use_container_width=True, hide_index=True)
-
     # Gráfico de encuestas
     _fig_polls = go.Figure()
     _firms = _poll_df["Firma"].tolist()
@@ -1891,49 +1876,32 @@ with t_proyeccion:
     )
     st.plotly_chart(_fig_margen, use_container_width=True)
 
-    # Proyección de votos basada en encuestas
-    st.subheader("Votos implícitos según encuestas")
-    st.caption(
-        "Asumiendo participación similar a 1ª vuelta (~23.7M votos válidos interior). "
-        "Se normaliza AE vs IC excluyendo blancos/NS."
+    # Gráfico mercados de predicción
+    st.subheader("Mercados de predicción")
+    _fig_pred = go.Figure()
+    _fig_pred.add_trace(go.Bar(
+        name="Polymarket (1 jun)", x=["AE", "IC"],
+        y=[88, 13], marker_color=["#1f77b4", "#CC0000"],
+        text=["88%", "13%"], textposition="outside",
+    ))
+    _fig_pred.add_trace(go.Bar(
+        name="Kalshi (may)", x=["AE", "IC"],
+        y=[43, 41], marker_color=["#5fa8e0", "#e06060"],
+        text=["43%", "41%"], textposition="outside",
+    ))
+    _fig_pred.add_hline(y=50, line_dash="dot", line_color="#C8A96E",
+                        annotation_text="50%", annotation_position="right")
+    _fig_pred.update_layout(
+        barmode="group", height=350,
+        title="Probabilidad de ganar la 2ª vuelta (mercados de apuestas)",
+        yaxis_title="% probabilidad", yaxis_range=[0, 100],
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        margin=dict(t=60, b=20),
     )
-    _votos_validos_1v = 23_685_329
-    _proj_rows = []
-    for _, r in _poll_df.iterrows():
-        ae_n = r["AE%"] / (r["AE%"] + r["IC%"])
-        ic_n = 1 - ae_n
-        _proj_rows.append({
-            "Firma":        r["Firma"],
-            "Fecha":        r["Fecha"],
-            "AE% (norm)":   f"{ae_n*100:.1f}%",
-            "IC% (norm)":   f"{ic_n*100:.1f}%",
-            "Votos AE":     f"{int(_votos_validos_1v * ae_n):,}",
-            "Votos IC":     f"{int(_votos_validos_1v * ic_n):,}",
-            "Margen votos": f"{int(_votos_validos_1v * (ae_n - ic_n)):+,}",
-        })
-    _prom_ae_n = _prom_ae_norm / 100
-    _prom_ic_n = _prom_ic_norm / 100
-    _proj_rows.append({
-        "Firma":        "**PROMEDIO**",
-        "Fecha":        "—",
-        "AE% (norm)":   f"{_prom_ae_norm:.1f}%",
-        "IC% (norm)":   f"{_prom_ic_norm:.1f}%",
-        "Votos AE":     f"{int(_votos_validos_1v * _prom_ae_n):,}",
-        "Votos IC":     f"{int(_votos_validos_1v * _prom_ic_n):,}",
-        "Margen votos": f"{int(_votos_validos_1v * (_prom_ae_n - _prom_ic_n)):+,}",
-    })
-    st.dataframe(pd.DataFrame(_proj_rows), use_container_width=True, hide_index=True)
-
-    # Mercados de predicción
-    st.subheader("Mercados de predicción (apuestas en tiempo real)")
-    _pred_df = pd.DataFrame([
-        ("Polymarket", "1 jun 2026", "AE 88%", "IC 13%", "Mercado de predicción descentralizado"),
-        ("Kalshi",     "may 2026",   "AE 43%", "IC 41%", "Pre-1ª vuelta"),
-    ], columns=["Plataforma", "Fecha", "AE prob.", "IC prob.", "Nota"])
-    st.dataframe(_pred_df, use_container_width=True, hide_index=True)
+    st.plotly_chart(_fig_pred, use_container_width=True)
     st.caption(
-        "Polymarket post-1ª vuelta: AE 88% de ganar la segunda vuelta (21 jun). "
-        "Los mercados de predicción agregan información de miles de apostadores con dinero real."
+        "Polymarket post-1ª vuelta: AE 88% de probabilidad de ganar el 21 jun. "
+        "Kalshi: pre-1ª vuelta, prácticamente empatados."
     )
 
     st.divider()
