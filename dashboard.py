@@ -1187,12 +1187,12 @@ with t_depts:
         if trace.name == "ABELARDO DE LA ESPRIELLA":
             trace.text = [f"{int(v):,}" for v in trace.customdata[:, 0]]
             trace.textposition = "inside"
-            trace.textfont = dict(size=10, color="#FFFFFF")
+            trace.textfont = dict(size=16, color="#FFFFFF", family="IBM Plex Mono")
             trace.insidetextanchor = "middle"
         else:
             trace.text = None
     fig.update_layout(
-        height=620,
+        height=820,
         legend_title="Candidato",
         yaxis={"categoryorder": "array", "categoryarray": orden_dept},
         xaxis=dict(ticksuffix="%", range=[0, 101]),
