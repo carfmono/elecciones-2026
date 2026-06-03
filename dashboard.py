@@ -738,17 +738,20 @@ with t_nacional:
     cn3.metric("% Participación",       f"{_pct_part:.2f}%")
 
     # ── Métricas interior ────────────────────────────────────────────────────────
-    st.caption("Municipios interiores")
-    c4, c5, c6 = st.columns(3)
-    c4.metric("Votos válidos",    f"{int(nac_int['votos_validos'].sum()):,}")
-    c5.metric("Mesas escrutadas", f"{int(nac_int['mesas_escrutadas'].sum()):,} / {int(nac_int['mesas_total'].sum()):,}")
-    c6.metric("Municipios",       f"{df_interior['muni_co'].nunique():,}")
+    # Municipios oficiales DANE vs corregimientos departamentales (Amazonas, Guainía, Vaupés)
+    _muni_oficial = 1_103
+    _correg_dept   = df_interior["muni_co"].nunique() - _muni_oficial
 
+    st.caption("Municipios interiores")
+    c4, c5, c6, c7 = st.columns(4)
+    c4.metric("Votos válidos",                  f"{int(nac_int['votos_validos'].sum()):,}")
+    c5.metric("Mesas escrutadas",               f"{int(nac_int['mesas_escrutadas'].sum()):,} / {int(nac_int['mesas_total'].sum()):,}")
+    c6.metric("Municipios (DANE)",              f"{_muni_oficial:,}")
+    c7.metric("Corregimientos departamentales", f"{_correg_dept:,}",
+              "Amazonas, Guainía, Vaupés", delta_color="off")
     st.caption(
-        f"El conteo oficial de municipios colombianos es 1.103, pero la Registraduría "
-        f"opera con {df_interior['muni_co'].nunique():,} circunscripciones electorales: "
-        "los 1.103 municipios más los corregimientos departamentales de Amazonas, Guainía "
-        "y Vaupés (territorios sin categoría de municipio pero con votación independiente)."
+        "Los corregimientos departamentales de Amazonas, Guainía y Vaupés no tienen "
+        "categoría de municipio pero operan como circunscripciones electorales independientes."
     )
 
     # ── Métricas exterior ────────────────────────────────────────────────────────
