@@ -73,6 +73,9 @@ h3, h4 {
     font-family: 'IBM Plex Mono', monospace !important;
     font-size: 0.82rem !important;
 }
+[data-testid="stMetricDelta"] svg {
+    display: none !important;
+}
 
 /* ─── Caption / info ─────────────────────────────────────────── */
 .stCaption, [data-testid="stCaptionContainer"] {
@@ -181,11 +184,73 @@ div[data-testid="stTabsContent"] h3 {
 
 /* ─── Mobile ─────────────────────────────────────────────────── */
 @media (max-width: 768px) {
-    #page-title-bar { top: 2.6rem; font-size: 0.88rem; padding: 4px 8px; }
-    div[data-testid="stTabs"] div[role="tablist"] { top: 5.1rem !important; padding: 3px 6px !important; }
-    div[data-testid="stTabsContent"] { padding-top: 195px !important; }
-    [data-testid="column"] { min-width: 260px !important; }
-    .stPlotlyChart { width: 100% !important; }
+
+    /* Título fijo: justo debajo del chrome de Streamlit en móvil */
+    #page-title-bar {
+        top: 3.0rem;
+        font-size: 0.82rem;
+        padding: 4px 10px;
+        letter-spacing: 0.04em;
+    }
+
+    /* Pestañas: debajo del título */
+    div[data-testid="stTabs"] div[role="tablist"] {
+        top: 5.2rem !important;
+        padding: 2px 6px !important;
+        font-size: 0.72rem !important;
+    }
+    div[data-testid="stTabs"] button[role="tab"] {
+        font-size: 0.7rem !important;
+        padding: 6px 10px !important;
+        min-width: 0 !important;
+    }
+
+    /* Contenido: reducir padding superior */
+    div[data-testid="stTabsContent"] {
+        padding-top: 148px !important;
+    }
+    div[data-testid="stTabsContent"] h1 {
+        font-size: 1.2rem !important;
+    }
+    div[data-testid="stTabsContent"] h2 {
+        font-size: 1rem !important;
+    }
+
+    /* Columnas: apilar en vertical */
+    [data-testid="column"] {
+        min-width: 100% !important;
+        width: 100% !important;
+    }
+    [data-testid="stHorizontalBlock"] {
+        flex-wrap: wrap !important;
+    }
+
+    /* Métricas: valor más compacto */
+    [data-testid="stMetricValue"] {
+        font-size: 1.25rem !important;
+    }
+    [data-testid="stMetric"] {
+        padding: 10px 12px !important;
+    }
+
+    /* Gráficos: ancho completo, sin desborde */
+    .stPlotlyChart {
+        width: 100% !important;
+        overflow-x: hidden !important;
+    }
+    .stPlotlyChart > div {
+        max-width: 100% !important;
+    }
+
+    /* Ocultar barra de herramientas de Plotly en móvil */
+    .modebar { display: none !important; }
+
+    /* Sliders y widgets más cómodos al tacto */
+    .stSlider > div { padding: 8px 0 !important; }
+    .stRadio > div > label { padding: 6px 0 !important; }
+
+    /* Sidebar: ocultar automáticamente */
+    [data-testid="stSidebar"][aria-expanded="false"] { display: none !important; }
 }
 </style>
 <div id="page-title-bar">Análisis Electoral &ndash; Primera Vuelta Colombia 2026</div>
@@ -285,6 +350,25 @@ def build_geo_lookup(geo_munis: dict) -> dict:
         _add(dpto, _norm(p["MPIO_CNMBR"]), code)
 
     return lookup
+
+
+def _fix_colombia_geo(fig: go.Figure, height: int = 420) -> go.Figure:
+    """Aplica bounds explícitos de Colombia y ajustes mobile-friendly a un choropleth."""
+    fig.update_geos(
+        visible=False,
+        lataxis_range=[-4.5, 13.0],
+        lonaxis_range=[-82.0, -66.5],
+        projection_type="mercator",
+    )
+    fig.update_layout(
+        height=height,
+        margin=dict(l=0, r=0, t=30, b=0),
+        paper_bgcolor="rgba(0,0,0,0)",
+        geo=dict(bgcolor="rgba(0,0,0,0)"),
+        dragmode=False,
+        autosize=True,
+    )
+    return fig
 
 
 def group_otros(df: pd.DataFrame, col: str = "candidato_presidente") -> pd.DataFrame:
@@ -597,8 +681,9 @@ def _reset_proyeccion() -> None:
         st.session_state[f"ae_{f}"]  = _dae[f]
         st.session_state[f"ic_{f}"]  = _dic[f]
         st.session_state[f"abs_{f}"] = _dabs[f]
-    st.session_state["nuevos_total"]  = 1_500_000
-    st.session_state["nuevos_ae_pct"] = 48
+    st.session_state["nuevos_total"]    = 1_500_000
+    st.session_state["nuevos_abs_pct"]  = 15
+    st.session_state["nuevos_ae_pct"]   = 48
 
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
@@ -771,13 +856,7 @@ with t_nacional:
         labels={"candidato_presidente": "Ganador", "v_AE": "V. Abelardo", "v_IC": "V. Cepeda"},
         title="",
     )
-    fig_map.update_geos(fitbounds="locations", visible=False)
-    fig_map.update_layout(
-        height=500, margin=dict(l=0, r=0, t=0, b=0),
-        paper_bgcolor="rgba(0,0,0,0)",
-        geo=dict(bgcolor="rgba(0,0,0,0)"),
-        dragmode=False,
-    )
+    _fix_colombia_geo(fig_map, height=480)
     st.plotly_chart(fig_map, use_container_width=True, config=_MAP_CFG)
 
     # ── Tabla con dptos ganados ──────────────────────────────────────────────
@@ -806,12 +885,17 @@ with t_nacional:
         {"Candidato": "Fajardo",        "pct":  4.21, "Bloque": "Centro"},
         {"Candidato": "Otros",          "pct":  3.41, "Bloque": "Otros"},
     ])
+    # Compute Otros 2026 from actual data (all candidates not in TOP_CANDS + votos blancos)
+    _top4_votos_nac = df_interior.groupby("candidato_presidente")["votos_candidato"].sum()
+    _validos_nac    = df_interior.drop_duplicates("muni_co")["votos_validos"].sum()
+    _top4_sum_v     = sum(_top4_votos_nac.get(c, 0) for c in TOP_CANDS)
+    _otros_2026_pct = round(100 - _top4_sum_v / _validos_nac * 100, 2)
     _cands_2026 = pd.DataFrame([
-        {"Candidato": "Cepeda",   "pct": 40.90, "Bloque": "Izquierda"},
-        {"Candidato": "Abelardo", "pct": 43.74, "Bloque": "Centro-der."},
-        {"Candidato": "Valencia", "pct":  6.92, "Bloque": "Centro-der."},
-        {"Candidato": "Fajardo",  "pct":  4.26, "Bloque": "Centro"},
-        {"Candidato": "Otros",    "pct":  4.18, "Bloque": "Otros"},
+        {"Candidato": "Cepeda",   "pct": 40.90,           "Bloque": "Izquierda"},
+        {"Candidato": "Abelardo", "pct": 43.74,           "Bloque": "Centro-der."},
+        {"Candidato": "Valencia", "pct":  6.92,           "Bloque": "Centro-der."},
+        {"Candidato": "Fajardo",  "pct":  4.26,           "Bloque": "Centro"},
+        {"Candidato": "Otros",    "pct": _otros_2026_pct, "Bloque": "Otros"},
     ])
     _cands_2022["Año"] = "2022"
     _cands_2026["Año"] = "2026"
@@ -1049,13 +1133,14 @@ with t_depts:
     agg_d = (df_dept.groupby(["dept_nombre", "candidato_presidente"], as_index=False)
                     .agg(votos=("votos_candidato", "sum")))
 
-    # Ordenar departamentos por total de votos descendente
-    orden_dept = (agg_d.groupby("dept_nombre")["votos"].sum()
-                       .sort_values(ascending=False).index.tolist())
-
     # Calcular porcentaje dentro de cada departamento
     agg_d["total_dept"] = agg_d.groupby("dept_nombre")["votos"].transform("sum")
     agg_d["pct_dept"]   = agg_d["votos"] / agg_d["total_dept"] * 100
+
+    # Ordenar departamentos por votos de Abelardo descendente (mayor Abelardo = arriba en chart)
+    _ae_by_dept = (agg_d[agg_d["candidato_presidente"] == "ABELARDO DE LA ESPRIELLA"]
+                   .set_index("dept_nombre")["votos"])
+    orden_dept = _ae_by_dept.sort_values(ascending=True).index.tolist()  # ascending=True → arriba = mayor
 
     st.subheader("Distribución % por departamento – Colombia interior (top 4 + Otros)")
     fig = px.bar(
@@ -1079,7 +1164,7 @@ with t_depts:
     fig.update_layout(
         height=620,
         legend_title="Candidato",
-        yaxis={"categoryorder": "total ascending"},
+        yaxis={"categoryorder": "array", "categoryarray": orden_dept},
         xaxis=dict(ticksuffix="%", range=[0, 101]),
         margin=dict(l=180, r=20, t=10, b=0),
     )
@@ -1119,14 +1204,8 @@ with t_depts:
         labels={"margen": "Margen AE−IC (pp)", "pct": "% AE", "pct_IC": "% IC"},
         title="Margen AE − IC por departamento (azul = AE lidera, rojo = IC lidera)",
     )
-    fig_margin.update_geos(fitbounds="locations", visible=False)
-    fig_margin.update_layout(
-        height=480, margin=dict(l=0, r=0, t=30, b=0),
-        paper_bgcolor="rgba(0,0,0,0)",
-        geo=dict(bgcolor="rgba(0,0,0,0)"),
-        dragmode=False,
-        coloraxis_colorbar=dict(title="Margen pp", thickness=15, len=0.6),
-    )
+    _fix_colombia_geo(fig_margin, height=460)
+    fig_margin.update_layout(coloraxis_colorbar=dict(title="Margen pp", thickness=15, len=0.6))
     st.plotly_chart(fig_margin, use_container_width=True, config=_MAP_CFG)
 
     # ── Mapa municipal: ganador por municipio ───────────────────────────────
@@ -1154,13 +1233,7 @@ with t_depts:
         labels={"ganador": "Ganador", "diff_AE_IC": "Diferencia AE−IC"},
     )
     fig_muni.update_layout(legend=dict(title="Ganador"))
-    fig_muni.update_geos(fitbounds="locations", visible=False)
-    fig_muni.update_layout(
-        height=620, margin=dict(l=0, r=0, t=0, b=0),
-        paper_bgcolor="rgba(0,0,0,0)",
-        geo=dict(bgcolor="rgba(0,0,0,0)"),
-        dragmode=False,
-    )
+    _fix_colombia_geo(fig_muni, height=580)
     st.plotly_chart(fig_muni, use_container_width=True, config=_MAP_CFG)
 
     # Participación promedio
@@ -1461,7 +1534,6 @@ with t_coalicion:
             "Claudia López (225,335 v.)*",
             coal_opts, index=2, horizontal=True, key="coal_claudia",
         )
-    st.caption("* Claudia López: solo total nacional disponible, sin desglose municipal")
     st.caption("Referencia 2022 (primera vuelta): Petro 40.3% · Rodolfo Hernández 28.2% · F. Gutiérrez 23.9% · Fajardo 4.2%")
 
     # ── Calcular coalición dinámica ─────────────────────────────────────────
@@ -1627,13 +1699,7 @@ with t_coalicion:
             labels={color_col: "Ganador"},
             title=title,
         )
-        fig.update_geos(fitbounds="locations", visible=False)
-        fig.update_layout(
-            height=420, margin=dict(l=0, r=0, t=30, b=0),
-            paper_bgcolor="rgba(0,0,0,0)",
-            geo=dict(bgcolor="rgba(0,0,0,0)"),
-            dragmode=False,
-        )
+        _fix_colombia_geo(fig, height=400)
         return fig
 
     _col_dm1, _col_dm2 = st.columns(2)
@@ -1671,13 +1737,7 @@ with t_coalicion:
             labels={color_col: "Ganador"},
             title=title,
         )
-        fig.update_geos(fitbounds="locations", visible=False)
-        fig.update_layout(
-            height=560, margin=dict(l=0, r=0, t=30, b=0),
-            paper_bgcolor="rgba(0,0,0,0)",
-            geo=dict(bgcolor="rgba(0,0,0,0)"),
-            dragmode=False,
-        )
+        _fix_colombia_geo(fig, height=500)
         return fig
 
     _col_mm1, _col_mm2 = st.columns(2)
@@ -1821,31 +1881,44 @@ with t_proyeccion:
 
     if "nuevos_total" not in st.session_state:
         st.session_state["nuevos_total"] = 1_500_000
+    if "nuevos_abs_pct" not in st.session_state:
+        st.session_state["nuevos_abs_pct"] = 15
     if "nuevos_ae_pct" not in st.session_state:
         st.session_state["nuevos_ae_pct"] = 48
 
-    cn1, cn2 = st.columns(2)
+    cn1, cn2, cn3 = st.columns(3)
     with cn1:
         nuevos_total = st.slider(
-            "Nuevos votantes adicionales",
-            min_value=500_000, max_value=3_000_000,
+            "Nuevos votantes potenciales",
+            min_value=500_000, max_value=4_000_000,
             step=50_000, key="nuevos_total",
             format="%,d",
-            help="Votantes que no participaron en primera vuelta pero sí en segunda",
+            help="Personas que no votaron en primera vuelta pero podrían votar en segunda",
         )
     with cn2:
-        nuevos_ae_pct = st.slider(
-            "% de nuevos votos para Abelardo",
+        nuevos_abs_pct = st.slider(
+            "% que no participa (abstención)",
+            min_value=0, max_value=80,
+            step=1, key="nuevos_abs_pct",
+            help="Fracción de los nuevos potenciales que finalmente no vota en segunda vuelta",
+        )
+    with cn3:
+        _ae_max = 100 - nuevos_abs_pct
+        nuevos_ae_pct_raw = st.slider(
+            "% de los que sí votan → Abelardo",
             min_value=0, max_value=100,
             step=1, key="nuevos_ae_pct",
-            help="El resto va a Cepeda. En segunda vuelta no hay candidatos menores.",
+            help="Del subgrupo que sí participa, qué fracción va a Abelardo. El resto va a Cepeda.",
         )
 
-    nuevos_ae  = int(nuevos_total * nuevos_ae_pct / 100)
-    nuevos_ic  = nuevos_total - nuevos_ae
+    _nuevos_participan = int(nuevos_total * (1 - nuevos_abs_pct / 100))
+    nuevos_ae  = int(_nuevos_participan * nuevos_ae_pct_raw / 100)
+    nuevos_ic  = _nuevos_participan - nuevos_ae
+    _nuevos_no_votan = nuevos_total - _nuevos_participan
     st.caption(
-        f"Nuevos votos: AE **{nuevos_ae:,}** · IC **{nuevos_ic:,}** "
-        f"(total nuevos: **{nuevos_total:,}**)"
+        f"De **{nuevos_total:,}** potenciales: **{_nuevos_participan:,}** votan — "
+        f"AE **{nuevos_ae:,}** · IC **{nuevos_ic:,}** — "
+        f"abstienen **{_nuevos_no_votan:,}**"
     )
 
     ae_total = ae_base + ae_extra + nuevos_ae
@@ -1935,11 +2008,11 @@ with t_proyeccion:
         "Abstención": "",
     })
     rows.append({
-        "Fuente":     f"NUEVOS VOTANTES 2ª vuelta ({nuevos_total:,})",
+        "Fuente":     f"NUEVOS VOTANTES potenciales ({nuevos_total:,})",
         "Votos 1ª":   "—",
-        "→ AE":       f"{nuevos_ae:,}  ({nuevos_ae_pct}%)",
-        "→ IC":       f"{nuevos_ic:,}  ({100-nuevos_ae_pct}%)",
-        "Abstención": "—",
+        "→ AE":       f"{nuevos_ae:,}  ({nuevos_ae_pct_raw}% de votantes)",
+        "→ IC":       f"{nuevos_ic:,}  ({100-nuevos_ae_pct_raw}% de votantes)",
+        "Abstención": f"{_nuevos_no_votan:,}  ({nuevos_abs_pct}%)",
     })
     rows.append({
         "Fuente":     "TOTAL PROYECTADO",
@@ -1975,13 +2048,16 @@ with t_antioquia:
         c5, c6, c7 = st.columns(3)
         c5.metric("Municipios ganados AE",
                   f"{munis_ae_ant} / {len(ant)}",
-                  f"{munis_ae_ant/len(ant)*100:.0f}%")
+                  f"{munis_ae_ant/len(ant)*100:.0f}%",
+                  delta_color="off")
         c6.metric("Municipios ganados IC",
                   f"{munis_ic_ant} / {len(ant)}",
-                  f"{munis_ic_ant/len(ant)*100:.0f}%")
+                  f"{munis_ic_ant/len(ant)*100:.0f}%",
+                  delta_color="inverse")
         diff_total = int(ant["votos_AE"].sum() - ant["votos_IC"].sum())
         c7.metric("Diferencia AE – IC", f"{diff_total:+,}",
-                  "AE gana" if diff_total > 0 else "IC gana")
+                  "AE gana" if diff_total > 0 else "IC gana",
+                  delta_color="off")
 
         st.divider()
 
@@ -2008,16 +2084,18 @@ with t_antioquia:
             labels={"ganador": "Ganador", "diff_AE_IC": "Diferencia AE−IC",
                     "pct_AE": "% AE", "pct_IC": "% IC"},
         )
-        fig_ant_map.update_geos(fitbounds="locations", visible=False)
+        # Antioquia: bounds específicos para la región
+        fig_ant_map.update_geos(
+            visible=False,
+            lataxis_range=[5.3, 8.9],
+            lonaxis_range=[-77.2, -73.8],
+            projection_type="mercator",
+        )
         fig_ant_map.update_layout(
-            height=640, margin=dict(l=0, r=0, t=0, b=0),
+            height=580, margin=dict(l=0, r=0, t=0, b=0),
             paper_bgcolor="rgba(0,0,0,0)",
-            dragmode=False,
-            geo=dict(
-                bgcolor="rgba(0,0,0,0)",
-                showframe=False,
-                showcoastlines=False,
-            ),
+            dragmode=False, autosize=True,
+            geo=dict(bgcolor="rgba(0,0,0,0)", showframe=False, showcoastlines=False),
         )
         st.plotly_chart(fig_ant_map, use_container_width=True, config=_MAP_CFG)
 
@@ -2050,6 +2128,45 @@ with t_antioquia:
             margin=dict(b=140),
         )
         st.plotly_chart(fig_ant, use_container_width=True)
+
+        # ── Barra: Paloma por municipio ──────────────────────────────────────
+        st.subheader("Todos los municipios de Antioquia – % Paloma Valencia")
+        ant_pal = ant.sort_values("pct_Valencia", ascending=False).copy()
+
+        fig_ant_pal = go.Figure()
+        fig_ant_pal.add_bar(
+            x=ant_pal["muni_nombre"],
+            y=ant_pal["pct_Valencia"],
+            name="% Paloma",
+            marker_color="#2ca02c",
+            hovertemplate="%{x}<br>Paloma: %{y:.1f}%<extra></extra>",
+        )
+        fig_ant_pal.add_bar(
+            x=ant_pal["muni_nombre"],
+            y=ant_pal["pct_AE"],
+            name="% AE",
+            marker_color="#1f77b4",
+            opacity=0.55,
+            hovertemplate="%{x}<br>AE: %{y:.1f}%<extra></extra>",
+        )
+        fig_ant_pal.add_bar(
+            x=ant_pal["muni_nombre"],
+            y=ant_pal["pct_IC"],
+            name="% IC",
+            marker_color="#CC0000",
+            opacity=0.55,
+            hovertemplate="%{x}<br>IC: %{y:.1f}%<extra></extra>",
+        )
+        fig_ant_pal.update_layout(
+            barmode="group",
+            height=500,
+            xaxis_tickangle=-60,
+            xaxis={"tickfont": {"size": 8}},
+            legend_title="Candidato",
+            yaxis_title="% Votos",
+            margin=dict(b=140),
+        )
+        st.plotly_chart(fig_ant_pal, use_container_width=True)
 
         # ── Top municipios AE vs IC ──────────────────────────────────────────
         col_a, col_b = st.columns(2)
