@@ -734,6 +734,13 @@ with t_nacional:
     c5.metric("Mesas escrutadas", f"{int(nac_int['mesas_escrutadas'].sum()):,} / {int(nac_int['mesas_total'].sum()):,}")
     c6.metric("Municipios",       f"{df_interior['muni_co'].nunique():,}")
 
+    st.caption(
+        f"El conteo oficial de municipios colombianos es 1.103, pero la Registraduría "
+        f"opera con {df_interior['muni_co'].nunique():,} circunscripciones electorales: "
+        "los 1.103 municipios más los corregimientos departamentales de Amazonas, Guainía "
+        "y Vaupés (territorios sin categoría de municipio pero con votación independiente)."
+    )
+
     # ── Métricas exterior ────────────────────────────────────────────────────────
     st.caption("Voto en el exterior (consulados)")
     cx1, cx2, cx3, cx4 = st.columns(4)
