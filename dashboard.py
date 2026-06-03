@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import plotly.io as pio
 import streamlit as st
 from pathlib import Path
 
@@ -20,57 +21,159 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# Fixed tab bar just below the Streamlit toolbar
+# Estilos – tema oscuro editorial
 st.markdown("""
 <style>
-/* ─── Fixed title bar ───────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+/* ─── Base app ───────────────────────────────────────────────── */
+body, .stApp, [data-testid="stAppViewContainer"] {
+    background-color: #0A0A0A !important;
+    color: #F0EDE8 !important;
+    font-family: 'IBM Plex Sans', sans-serif !important;
+}
+
+/* ─── Títulos ────────────────────────────────────────────────── */
+h1, h2 {
+    font-family: Georgia, serif !important;
+    color: #F0EDE8 !important;
+    font-weight: 400 !important;
+    letter-spacing: 0.02em !important;
+    border-bottom: 1px solid #2A2A2A !important;
+    padding-bottom: 10px !important;
+}
+h3, h4 {
+    font-family: 'IBM Plex Sans', sans-serif !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.15em !important;
+    font-size: 0.72rem !important;
+    color: #C8A96E !important;
+    font-weight: 500 !important;
+}
+
+/* ─── Métricas ────────────────────────────────────────────────── */
+[data-testid="stMetric"] {
+    background: #111111 !important;
+    border-left: 3px solid #C8A96E !important;
+    padding: 14px 18px !important;
+    border-radius: 2px !important;
+}
+[data-testid="stMetricLabel"] {
+    text-transform: uppercase !important;
+    letter-spacing: 0.12em !important;
+    font-size: 0.68rem !important;
+    color: #9A9A90 !important;
+}
+[data-testid="stMetricValue"] {
+    font-family: 'IBM Plex Mono', monospace !important;
+    color: #F0EDE8 !important;
+    font-size: 1.7rem !important;
+}
+[data-testid="stMetricDelta"] {
+    font-family: 'IBM Plex Mono', monospace !important;
+    font-size: 0.82rem !important;
+}
+
+/* ─── Caption / info ─────────────────────────────────────────── */
+.stCaption, [data-testid="stCaptionContainer"] {
+    color: #9A9A90 !important;
+    font-style: italic !important;
+    font-size: 0.78rem !important;
+}
+.stAlert {
+    background-color: #111111 !important;
+    border: 1px solid #2A2A2A !important;
+    border-left: 3px solid #C8A96E !important;
+    border-radius: 2px !important;
+    color: #F0EDE8 !important;
+}
+
+/* ─── Sidebar ────────────────────────────────────────────────── */
+[data-testid="stSidebar"] {
+    background-color: #0D0D0D !important;
+    border-right: 1px solid #1E1E1E !important;
+}
+
+/* ─── Selectbox / widgets ────────────────────────────────────── */
+.stSelectbox > div > div,
+.stSlider > div,
+.stRadio > div {
+    background: #111111 !important;
+    border-color: #2A2A2A !important;
+    border-radius: 2px !important;
+    color: #F0EDE8 !important;
+}
+
+/* ─── Dataframe / tables ─────────────────────────────────────── */
+[data-testid="stDataFrame"] {
+    background: #111111 !important;
+    border: 1px solid #2A2A2A !important;
+    border-radius: 2px !important;
+}
+
+/* ─── Divisores ──────────────────────────────────────────────── */
+hr {
+    border-color: #2A2A2A !important;
+    margin: 36px 0 !important;
+}
+
+/* ─── Barra de título fija ───────────────────────────────────── */
 #page-title-bar {
     position: fixed;
     top: 3.25rem;
     left: 0;
     right: 0;
     z-index: 999992;
-    background-color: #ffffff !important;
+    background-color: #0A0A0A !important;
     backdrop-filter: none !important;
     text-align: center;
-    padding: 5px 16px;
-    font-size: 1.2rem;
-    font-weight: 700;
-    color: #262730;
-    letter-spacing: 0.02em;
-    border-bottom: 1px solid rgba(128, 128, 128, 0.25);
-    line-height: 1.3;
+    padding: 6px 16px;
+    font-size: 1.05rem;
+    font-weight: 400;
+    font-family: Georgia, serif;
+    color: #C8A96E;
+    letter-spacing: 0.08em;
+    border-bottom: 1px solid #2A2A2A;
+    line-height: 1.4;
 }
 
-/* ─── Fixed tab buttons row (below title bar) ───────────────── */
+/* ─── Pestañas fijas ─────────────────────────────────────────── */
 div[data-testid="stTabs"] div[role="tablist"] {
     position: fixed !important;
     top: 5.7rem !important;
     left: 0 !important;
     right: 0 !important;
     z-index: 999990 !important;
-    background-color: #ffffff !important;
+    background-color: #0A0A0A !important;
     backdrop-filter: none !important;
     padding: 4px 16px !important;
-    border-bottom: 1px solid rgba(128, 128, 128, 0.2) !important;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.15) !important;
+    border-bottom: 1px solid #2A2A2A !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.5) !important;
     overflow-x: auto !important;
     white-space: nowrap !important;
 }
+div[data-testid="stTabs"] button[role="tab"] {
+    color: #9A9A90 !important;
+    font-family: 'IBM Plex Sans', sans-serif !important;
+    font-size: 0.78rem !important;
+    letter-spacing: 0.05em !important;
+}
+div[data-testid="stTabs"] button[role="tab"][aria-selected="true"] {
+    color: #C8A96E !important;
+    border-bottom-color: #C8A96E !important;
+}
 
-/* ─── Push ALL tab content below the two fixed bars ─────────── */
+/* ─── Contenido de pestañas ──────────────────────────────────── */
 div[data-testid="stTabsContent"] {
     padding-top: 175px !important;
     margin-top: 0 !important;
 }
-
-/* ─── Section titles: solid opaque background ──────────────── */
 div[data-testid="stTabsContent"] h1,
 div[data-testid="stTabsContent"] h2,
 div[data-testid="stTabsContent"] h3 {
     position: relative;
     z-index: 1;
-    background-color: #ffffff !important;
+    background-color: #0A0A0A !important;
     padding-top: 8px !important;
     padding-bottom: 4px !important;
     margin-top: 0 !important;
@@ -78,24 +181,11 @@ div[data-testid="stTabsContent"] h3 {
 
 /* ─── Mobile ─────────────────────────────────────────────────── */
 @media (max-width: 768px) {
-    #page-title-bar {
-        top: 2.6rem;
-        font-size: 0.95rem;
-        padding: 4px 8px;
-    }
-    div[data-testid="stTabs"] div[role="tablist"] {
-        top: 5.1rem !important;
-        padding: 3px 6px !important;
-    }
-    div[data-testid="stTabsContent"] {
-        padding-top: 195px !important;
-    }
-    [data-testid="column"] {
-        min-width: 260px !important;
-    }
-    .stPlotlyChart {
-        width: 100% !important;
-    }
+    #page-title-bar { top: 2.6rem; font-size: 0.88rem; padding: 4px 8px; }
+    div[data-testid="stTabs"] div[role="tablist"] { top: 5.1rem !important; padding: 3px 6px !important; }
+    div[data-testid="stTabsContent"] { padding-top: 195px !important; }
+    [data-testid="column"] { min-width: 260px !important; }
+    .stPlotlyChart { width: 100% !important; }
 }
 </style>
 <div id="page-title-bar">Análisis Electoral &ndash; Primera Vuelta Colombia 2026</div>
@@ -209,7 +299,7 @@ def add_trend(fig: go.Figure, x_data, y_data,
     y = np.asarray(y_data, dtype=float)
     valid = ~(np.isnan(x) | np.isnan(y))
     x, y = x[valid], y[valid]
-    if len(x) < 3:
+    if len(x) < 5:
         return
     m, b = np.polyfit(x, y, 1)
     x_range = np.linspace(x.min(), x.max(), 200)
@@ -383,6 +473,11 @@ def load_data():
         lambda r: get_divipola(r["dept_co"], r["muni_nombre"]), axis=1
     )
 
+    _unmatched = mun[mun["divipola_muni"] == ""][["dept_co", "dept_nombre", "muni_nombre"]]
+    if not _unmatched.empty:
+        import logging as _logging
+        _logging.warning(f"[DIVIPOLA] {len(_unmatched)} municipios sin match:\n{_unmatched.to_string()}")
+
     # GeoJSON filtrado solo con Antioquia (más rápido y mejor zoom en ese mapa)
     geo_ant = {
         "type": "FeatureCollection",
@@ -397,15 +492,45 @@ def load_data():
 
 df, mun, pre, geo_depts, geo_munis, geo_ant = load_data()
 
-# ── Detección de tema (light / dark) ──────────────────────────────────────────
-_theme_base  = st.get_option("theme.base") or "dark"
-_is_dark     = _theme_base != "light"
-# Plotly template that matches the current theme
-_PLOTLY_TPL  = "plotly_dark" if _is_dark else "plotly_white"
-# Geo colors for the world map
-_GEO_LAND    = "rgba(55,55,55,0.45)"   if _is_dark else "rgba(210,210,210,0.6)"
-_GEO_OCEAN   = "rgba(20,35,55,0.55)"   if _is_dark else "rgba(170,210,240,0.55)"
-_GEO_COAST   = "rgba(255,255,255,0.15)" if _is_dark else "rgba(80,80,80,0.35)"
+# ── Tema oscuro editorial (fijo) ──────────────────────────────────────────────
+_PLOTLY_TPL = "plotly_dark"
+_GEO_LAND   = "rgba(40,40,40,0.7)"
+_GEO_OCEAN  = "rgba(10,20,35,0.7)"
+_GEO_COAST  = "rgba(200,169,110,0.2)"
+
+pio.templates["editorial_dark"] = go.layout.Template(
+    layout=go.Layout(
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="#111111",
+        font=dict(family="IBM Plex Sans, sans-serif", color="#9A9A90", size=12),
+        title=dict(font=dict(family="Georgia, serif", color="#F0EDE8", size=14)),
+        xaxis=dict(
+            gridcolor="#1E1E1E", showgrid=True,
+            zeroline=False, showline=False,
+            tickfont=dict(color="#9A9A90"),
+        ),
+        yaxis=dict(
+            gridcolor="#1E1E1E", showgrid=True,
+            zeroline=False, showline=False,
+            tickfont=dict(color="#9A9A90"),
+        ),
+        legend=dict(
+            bgcolor="rgba(17,17,17,0.8)",
+            bordercolor="#2A2A2A", borderwidth=1,
+            font=dict(color="#9A9A90"),
+        ),
+        hoverlabel=dict(
+            bgcolor="#1A1A1A", font_color="#F0EDE8",
+            bordercolor="#C8A96E",
+        ),
+        coloraxis=dict(colorbar=dict(
+            tickfont=dict(color="#9A9A90"),
+            title=dict(font=dict(color="#9A9A90")),
+        )),
+    )
+)
+pio.templates.default = "editorial_dark"
+_PLOTLY_TPL = "editorial_dark"
 
 # Separar voto interior (municipios) del exterior (consulados)
 df_interior  = df[df["dept_nombre"] != "CONSULADOS"]
@@ -472,10 +597,12 @@ def _reset_proyeccion() -> None:
         st.session_state[f"ae_{f}"]  = _dae[f]
         st.session_state[f"ic_{f}"]  = _dic[f]
         st.session_state[f"abs_{f}"] = _dabs[f]
+    st.session_state["nuevos_total"]  = 1_500_000
+    st.session_state["nuevos_ae_pct"] = 48
 
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
-t1, t2, t7, t3, t4, t5, t6 = st.tabs([
+t_nacional, t_depts, t_antioquia, t_fuerza_ae, t_fuerza_paloma, t_coalicion, t_proyeccion = st.tabs([
     "Resultados Nacionales",
     "Por Departamento",
     "Solo Antioquia",
@@ -489,12 +616,12 @@ t1, t2, t7, t3, t4, t5, t6 = st.tabs([
 # ═══════════════════════════════════════════════════════════════════════════════
 # TAB 1 – RESULTADOS NACIONALES
 # ═══════════════════════════════════════════════════════════════════════════════
-with t1:
+with t_nacional:
     st.title("Resultados Primera Vuelta – Colombia 2026")
 
     # ── Cálculos ─────────────────────────────────────────────────────────────────
     nac_int = df_interior.drop_duplicates("muni_co")
-    nac_ext = df_exterior.drop_duplicates("muni_co")
+    nac_ext = df_exterior.drop_duplicates("muni_co")  # una fila por consulado para sumar habilitados
 
     _hab_int    = int((nac_int["total_votantes"] + nac_int["total_abstencion"]).sum())
     _vot_int    = int(nac_int["total_votantes"].sum())
@@ -556,13 +683,13 @@ with t1:
             labels={"votos": "Votos", "candidato_presidente": ""},
         )
         fig.update_traces(
-            textposition="outside",
-            cliponaxis=False,       # permite que el texto salga más allá del eje
+            texttemplate="%{x:,.0f}",
+            textposition="auto",
+            cliponaxis=False,
         )
         fig.update_layout(
             showlegend=False, height=320,
-            # margen derecho amplio para que los números no se corten
-            margin=dict(l=0, r=160, t=10, b=0),
+            margin=dict(l=0, r=120, t=10, b=0),
             yaxis={"categoryorder": "total ascending"},
             xaxis={"autorange": True},
         )
@@ -582,18 +709,28 @@ with t1:
         agg_pie["nombre_corto"] = agg_pie["candidato_presidente"].map(
             lambda x: SHORT.get(x, x.split()[0])
         )
+        _total_pie = agg_pie["votos"].sum()
         fig2 = px.pie(
             agg_pie, values="votos", names="nombre_corto",
             color="candidato_presidente", color_discrete_map=COLORS, hole=0.4,
         )
+        # Rebanadas < 5 %: etiqueta vacía (visible solo en leyenda)
         fig2.update_traces(
-            texttemplate="<b>%{label}</b><br>%{percent:.1%}",
-            textposition="inside",
-            insidetextorientation="radial",
+            texttemplate="%{customdata}",
+            textposition="outside",
+            insidetextorientation="horizontal",
+            pull=[0.05 if i == 0 else 0 for i in range(len(agg_pie))],
+            customdata=[
+                f"<b>{row['nombre_corto']}</b><br>{row['votos']/_total_pie*100:.1f}%"
+                if row["votos"] / _total_pie >= 0.05 else ""
+                for _, row in agg_pie.iterrows()
+            ],
         )
         fig2.update_layout(
-            showlegend=False, height=320,
-            margin=dict(l=10, r=10, t=10, b=10),
+            showlegend=True,
+            legend=dict(orientation="v", x=1.02, y=0.5),
+            height=380,
+            margin=dict(l=20, r=110, t=30, b=60),
         )
         st.plotly_chart(fig2, use_container_width=True)
 
@@ -657,6 +794,98 @@ with t1:
     tabla["% Votos"] = tabla["% Votos"].apply(lambda v: f"{v:.2f}%")
     st.dataframe(tabla, use_container_width=True, hide_index=True)
 
+    # ── Comparación histórica 2022 vs 2026 ──────────────────────────────────
+    st.divider()
+    st.subheader("Contexto histórico: primera vuelta 2022 vs 2026")
+    st.caption("2022: datos oficiales Registraduría. Bloques definidos por alineación ideológica.")
+
+    _cands_2022 = pd.DataFrame([
+        {"Candidato": "Petro",          "pct": 40.32, "Bloque": "Izquierda"},
+        {"Candidato": "Rodolfo",        "pct": 28.15, "Bloque": "Centro-der."},
+        {"Candidato": "Fico Gutiérrez", "pct": 23.91, "Bloque": "Centro-der."},
+        {"Candidato": "Fajardo",        "pct":  4.21, "Bloque": "Centro"},
+        {"Candidato": "Otros",          "pct":  3.41, "Bloque": "Otros"},
+    ])
+    _cands_2026 = pd.DataFrame([
+        {"Candidato": "Cepeda",   "pct": 40.90, "Bloque": "Izquierda"},
+        {"Candidato": "Abelardo", "pct": 43.74, "Bloque": "Centro-der."},
+        {"Candidato": "Valencia", "pct":  6.92, "Bloque": "Centro-der."},
+        {"Candidato": "Fajardo",  "pct":  4.26, "Bloque": "Centro"},
+        {"Candidato": "Otros",    "pct":  4.18, "Bloque": "Otros"},
+    ])
+    _cands_2022["Año"] = "2022"
+    _cands_2026["Año"] = "2026"
+    _cands_hist = pd.concat([_cands_2022, _cands_2026], ignore_index=True)
+
+    _COLOR_HIST = {
+        "Petro":          "#CC0000",
+        "Cepeda":         "#CC0000",
+        "Fico Gutiérrez": "#1f77b4",
+        "Rodolfo":        "#4a9ad4",
+        "Abelardo":       "#1f77b4",
+        "Valencia":       "#2ca02c",
+        "Fajardo":        "#ff7f0e",
+        "Otros":          "#aaaaaa",
+    }
+
+    _bloques_hist = (_cands_hist.groupby(["Año", "Bloque"], as_index=False)
+                                .agg(pct=("pct", "sum")))
+
+    _col_h1, _col_h2 = st.columns([3, 2])
+    with _col_h1:
+        fig_hist = px.bar(
+            _cands_hist,
+            x="Año", y="pct", color="Candidato",
+            barmode="stack",
+            color_discrete_map=_COLOR_HIST,
+            text="pct",
+            labels={"pct": "% Votos", "Año": ""},
+            title="Distribución del voto por candidato",
+        )
+        fig_hist.update_traces(
+            texttemplate="%{text:.1f}%", textposition="inside",
+            insidetextanchor="middle",
+        )
+        fig_hist.update_layout(height=380, margin=dict(t=40, b=10))
+        st.plotly_chart(fig_hist, use_container_width=True)
+
+    with _col_h2:
+        _COLOR_BLOQUES = {
+            "Izquierda":  "#CC0000",
+            "Centro-der.": "#1f77b4",
+            "Centro":     "#ff7f0e",
+            "Otros":      "#aaaaaa",
+        }
+        fig_bloq = px.bar(
+            _bloques_hist,
+            x="Año", y="pct", color="Bloque",
+            barmode="stack",
+            color_discrete_map=_COLOR_BLOQUES,
+            text="pct",
+            labels={"pct": "% Votos", "Año": ""},
+            title="Bloques políticos",
+        )
+        fig_bloq.update_traces(
+            texttemplate="%{text:.1f}%", textposition="inside",
+            insidetextanchor="middle",
+        )
+        fig_bloq.update_layout(height=380, margin=dict(t=40, b=10))
+        st.plotly_chart(fig_bloq, use_container_width=True)
+
+    _izq_2022 = _cands_2022[_cands_2022["Bloque"] == "Izquierda"]["pct"].sum()
+    _izq_2026 = _cands_2026[_cands_2026["Bloque"] == "Izquierda"]["pct"].sum()
+    _der_2022 = _cands_2022[_cands_2022["Bloque"] == "Centro-der."]["pct"].sum()
+    _der_2026 = _cands_2026[_cands_2026["Bloque"] == "Centro-der."]["pct"].sum()
+    _ae_pct   = _cands_2026[_cands_2026["Candidato"] == "Abelardo"]["pct"].iloc[0]
+    _val_pct  = _cands_2026[_cands_2026["Candidato"] == "Valencia"]["pct"].iloc[0]
+    st.info(
+        f"El voto de izquierda (Petro 2022 → Cepeda 2026) se mantuvo estable: "
+        f"**{_izq_2022:.1f}% → {_izq_2026:.1f}%** (+{_izq_2026-_izq_2022:.1f} pp).  "
+        f"El bloque de derecha pasó de {_der_2022:.1f}% (disperso entre Fico y Rodolfo) "
+        f"a {_der_2026:.1f}% (Abelardo {_ae_pct:.1f}% + Paloma {_val_pct:.1f}%). "
+        f"Fajardo mantuvo su base: 4.21% → 4.26%."
+    )
+
     # ── Voto en el Exterior ──────────────────────────────────────────────────
     st.divider()
     st.subheader("Voto en el Exterior (Consulados)")
@@ -710,7 +939,7 @@ with t1:
     # ── Mapa mundial: ganador por país ───────────────────────────────────────
     st.subheader("Mapa mundial – Ganador por país")
 
-    PAIS_ISO3 = {
+    PAIS_ISO3 = {_norm(k): v for k, v in {
         "ALEMANIA": "DEU", "ARGENTINA": "ARG", "AUSTRALIA": "AUS",
         "AUSTRIA": "AUT", "BELGICA": "BEL", "BOLIVIA": "BOL",
         "BRASIL": "BRA", "CANADA": "CAN", "CHILE": "CHL",
@@ -731,15 +960,14 @@ with t1:
         "RUSIA": "RUS", "SUECIA": "SWE", "SUIZA": "CHE",
         "TAILANDIA": "THA", "TRINIDAD Y TOBAGO": "TTO", "TURQUIA": "TUR",
         "UCRANIA": "UKR", "URUGUAY": "URY", "VENEZUELA": "VEN",
-        # Países adicionales presentes en datos de consulados
-        "ARUBA": "ABW", "AZERBAIYAN": "AZE", "COREA DEL SUR": "KOR",
+        "ARGELIA": "DZA", "ARUBA": "ABW", "AZERBAIYAN": "AZE", "COREA DEL SUR": "KOR",
         "CURAZAO": "CUW", "GHANA": "GHA", "HAITI": "HTI",
         "INDONESIA": "IDN", "INGLATERRA": "GBR", "IRLANDA": "IRL",
         "JAMAICA": "JAM", "KENIA": "KEN", "MALASIA": "MYS",
         "NUEVA ZELANDIA": "NZL", "PAISES BAJOS": "NLD", "PUERTO RICO": "PRI",
         "REPUBLICA DE SINGAPUR": "SGP",
         "REPUBLICA SOCIALISTA DE VIETNA": "VNM", "SUDAFRICA": "ZAF",
-    }
+    }.items()}
 
     def _pais_from_muni(name: str) -> str:
         n = _norm(name)
@@ -813,7 +1041,7 @@ with t1:
 # ═══════════════════════════════════════════════════════════════════════════════
 # TAB 2 – POR DEPARTAMENTO
 # ═══════════════════════════════════════════════════════════════════════════════
-with t2:
+with t_depts:
     st.title("Distribución por Departamento")
 
     # Agrupación con OTROS por departamento — solo interior (sin consulados)
@@ -832,8 +1060,8 @@ with t2:
     st.subheader("Distribución % por departamento – Colombia interior (top 4 + Otros)")
     fig = px.bar(
         agg_d,
-        x="dept_nombre",
-        y="pct_dept",
+        y="dept_nombre",
+        x="pct_dept",
         color="candidato_presidente",
         color_discrete_map=COLORS,
         category_orders={
@@ -842,16 +1070,18 @@ with t2:
         },
         labels={
             "pct_dept": "% Votos",
-            "dept_nombre": "Departamento",
+            "dept_nombre": "",
             "candidato_presidente": "Candidato",
         },
+        orientation="h",
         barmode="stack",
     )
     fig.update_layout(
-        height=520, xaxis_tickangle=-45,
+        height=620,
         legend_title="Candidato",
-        margin=dict(b=120),
-        yaxis=dict(ticksuffix="%", range=[0, 101]),
+        yaxis={"categoryorder": "total ascending"},
+        xaxis=dict(ticksuffix="%", range=[0, 101]),
+        margin=dict(l=180, r=20, t=10, b=0),
     )
     st.plotly_chart(fig, use_container_width=True)
 
@@ -868,53 +1098,36 @@ with t2:
     ae_dept["divipola"] = ae_dept["dept_nombre"].map(DEPT_TO_DIVIPOLA)
     ae_dept = ae_dept.dropna(subset=["divipola"])
 
-    col_ma, col_mb = st.columns(2)
-    with col_ma:
-        fig_ae = px.choropleth(
-            ae_dept,
-            geojson=geo_depts,
-            locations="divipola",
-            featureidkey="properties.DPTO",
-            color="pct",
-            color_continuous_scale="Blues",
-            hover_name="dept_nombre",
-            hover_data={"pct": ":.1f", "votos": ":,", "divipola": False},
-            labels={"pct": "% Abelardo"},
-            title="% Abelardo",
-        )
-        fig_ae.update_geos(fitbounds="locations", visible=False)
-        fig_ae.update_layout(
-            height=420, margin=dict(l=0, r=0, t=30, b=0),
-            paper_bgcolor="rgba(0,0,0,0)",
-            geo=dict(bgcolor="rgba(0,0,0,0)"),
-            dragmode=False,
-        )
-        st.plotly_chart(fig_ae, use_container_width=True, config=_MAP_CFG)
+    ae_dept_mg = ae_dept.copy()
+    ic_dept_vals = (dept_agg2[dept_agg2["candidato_presidente"] == "IVÁN CEPEDA CASTRO"]
+                    [["dept_nombre", "pct"]]
+                    .rename(columns={"pct": "pct_IC"}))
+    ae_dept_mg = ae_dept_mg.merge(ic_dept_vals, on="dept_nombre", how="left")
+    ae_dept_mg["margen"] = ae_dept_mg["pct"] - ae_dept_mg["pct_IC"]
 
-    with col_mb:
-        ic_dept = dept_agg2[dept_agg2["candidato_presidente"] == "IVÁN CEPEDA CASTRO"].copy()
-        ic_dept["divipola"] = ic_dept["dept_nombre"].map(DEPT_TO_DIVIPOLA)
-        ic_dept = ic_dept.dropna(subset=["divipola"])
-        fig_ic = px.choropleth(
-            ic_dept,
-            geojson=geo_depts,
-            locations="divipola",
-            featureidkey="properties.DPTO",
-            color="pct",
-            color_continuous_scale="Reds",
-            hover_name="dept_nombre",
-            hover_data={"pct": ":.1f", "votos": ":,", "divipola": False},
-            labels={"pct": "% Cepeda"},
-            title="% Cepeda",
-        )
-        fig_ic.update_geos(fitbounds="locations", visible=False)
-        fig_ic.update_layout(
-            height=420, margin=dict(l=0, r=0, t=30, b=0),
-            paper_bgcolor="rgba(0,0,0,0)",
-            geo=dict(bgcolor="rgba(0,0,0,0)"),
-            dragmode=False,
-        )
-        st.plotly_chart(fig_ic, use_container_width=True, config=_MAP_CFG)
+    fig_margin = px.choropleth(
+        ae_dept_mg,
+        geojson=geo_depts,
+        locations="divipola",
+        featureidkey="properties.DPTO",
+        color="margen",
+        color_continuous_scale="RdBu",
+        color_continuous_midpoint=0,
+        range_color=[-40, 40],
+        hover_name="dept_nombre",
+        hover_data={"pct": ":.1f", "pct_IC": ":.1f", "margen": ":.1f", "divipola": False},
+        labels={"margen": "Margen AE−IC (pp)", "pct": "% AE", "pct_IC": "% IC"},
+        title="Margen AE − IC por departamento (azul = AE lidera, rojo = IC lidera)",
+    )
+    fig_margin.update_geos(fitbounds="locations", visible=False)
+    fig_margin.update_layout(
+        height=480, margin=dict(l=0, r=0, t=30, b=0),
+        paper_bgcolor="rgba(0,0,0,0)",
+        geo=dict(bgcolor="rgba(0,0,0,0)"),
+        dragmode=False,
+        coloraxis_colorbar=dict(title="Margen pp", thickness=15, len=0.6),
+    )
+    st.plotly_chart(fig_margin, use_container_width=True, config=_MAP_CFG)
 
     # ── Mapa municipal: ganador por municipio ───────────────────────────────
     st.subheader("Mapa: ganador por municipio")
@@ -940,6 +1153,7 @@ with t2:
         },
         labels={"ganador": "Ganador", "diff_AE_IC": "Diferencia AE−IC"},
     )
+    fig_muni.update_layout(legend=dict(title="Ganador"))
     fig_muni.update_geos(fitbounds="locations", visible=False)
     fig_muni.update_layout(
         height=620, margin=dict(l=0, r=0, t=0, b=0),
@@ -962,11 +1176,32 @@ with t2:
     fig2.update_layout(height=400, xaxis_tickangle=-45, margin=dict(b=120))
     st.plotly_chart(fig2, use_container_width=True)
 
+    st.subheader("Abstención por municipio – distribución")
+    fig_abs = px.histogram(
+        mun_interior,
+        x="pct_participacion",
+        nbins=30,
+        color="ganador",
+        color_discrete_map=GANADOR_COLORS,
+        barmode="overlay",
+        opacity=0.7,
+        labels={"pct_participacion": "% Participación", "ganador": "Ganador"},
+        title="Distribución de participación según ganador del municipio",
+    )
+    _media_part = mun_interior["pct_participacion"].mean()
+    fig_abs.add_vline(
+        x=_media_part,
+        line_dash="dash", line_color="gray",
+        annotation_text=f"Media {_media_part:.1f}%",
+        annotation_position="top right",
+    )
+    st.plotly_chart(fig_abs, use_container_width=True)
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # TAB 3 – FUERZA ABELARDO
 # ═══════════════════════════════════════════════════════════════════════════════
-with t3:
+with t_fuerza_ae:
     st.title("Donde fue fuerte Abelardo De La Espriella")
 
     top_n = st.slider("Número de municipios", 10, 100, 30)
@@ -985,8 +1220,14 @@ with t3:
             orientation="h",
             labels={"pct_AE": "% Votos AE", "muni_label": "", "dept_nombre": "Depto."},
         )
+        _nac_pct_AE = mun_interior["pct_AE"].mean()
+        fig.add_vline(
+            x=_nac_pct_AE, line_dash="dash", line_color="gray", opacity=0.6,
+            annotation_text=f"Media nacional {_nac_pct_AE:.1f}%",
+            annotation_position="top right",
+        )
         fig.update_layout(
-            height=max(400, top_n * 20), showlegend=True,
+            height=min(max(400, top_n * 22), 1400), showlegend=True,
             margin=dict(l=0, r=20, t=10, b=0),
             yaxis={"categoryorder": "total ascending"},
         )
@@ -1004,28 +1245,70 @@ with t3:
         top_show.columns = ["Depto", "Municipio", "V_AE", "% AE", "V_IC", "% IC", "Dif"]
         st.dataframe(top_show, use_container_width=True, hide_index=True, height=600)
 
-    # Scatter % AE vs % IC con línea de tendencia
+    # Scatter % AE vs % IC — contexto nacional, departamento resaltado si hay filtro
     st.subheader("% AE vs % IC por municipio")
-    fig3 = px.scatter(
-        mun_f, x="pct_AE", y="pct_IC",
-        color="dept_nombre", hover_name="muni_label",
-        hover_data={"votos_AE": ":,", "votos_IC": ":,", "dept_nombre": True},
-        labels={"pct_AE": "% Abelardo", "pct_IC": "% Cepeda"},
-        opacity=0.7,
-    )
+    _sc3_base = mun_interior.copy()
+    _sc3_base["muni_label"] = _sc3_base.apply(_muni_label, axis=1)
+
+    if sel_dept not in ("Todos", EXTERIOR_LABEL):
+        _sc3_bg = _sc3_base[_sc3_base["dept_nombre"] != sel_dept]
+        _sc3_hl = _sc3_base[_sc3_base["dept_nombre"] == sel_dept]
+        fig3 = go.Figure()
+        fig3.add_trace(go.Scatter(
+            x=_sc3_bg["pct_AE"], y=_sc3_bg["pct_IC"],
+            mode="markers", name="Otros departamentos",
+            marker=dict(color="#cccccc", opacity=0.2, size=4),
+            text=_sc3_bg["muni_label"],
+            hovertemplate="%{text}<br>AE: %{x:.1f}%  IC: %{y:.1f}%<extra></extra>",
+        ))
+        fig3.add_trace(go.Scatter(
+            x=_sc3_hl["pct_AE"], y=_sc3_hl["pct_IC"],
+            mode="markers", name=sel_dept,
+            marker=dict(color="#1f77b4", opacity=0.9, size=7),
+            text=_sc3_hl["muni_label"],
+            hovertemplate="%{text}<br>AE: %{x:.1f}%  IC: %{y:.1f}%<extra></extra>",
+        ))
+        fig3.update_layout(
+            xaxis_title="% Abelardo", yaxis_title="% Cepeda",
+            xaxis=dict(range=[0, 100]), yaxis=dict(range=[0, 100]),
+        )
+    else:
+        fig3 = px.scatter(
+            mun_f, x="pct_AE", y="pct_IC",
+            color="dept_nombre", hover_name="muni_label",
+            hover_data={"votos_AE": ":,", "votos_IC": ":,", "dept_nombre": True},
+            labels={"pct_AE": "% Abelardo", "pct_IC": "% Cepeda"},
+            opacity=0.7,
+        )
+
     fig3.add_shape(
         type="line", x0=0, y0=0, x1=100, y1=100,
         line=dict(dash="dash", color="gray", width=1),
     )
-    add_trend(fig3, mun_f["pct_AE"], mun_f["pct_IC"], color="black", name="Tendencia")
+    fig3.add_annotation(
+        x=73, y=82, text="IC gana", showarrow=False,
+        font=dict(color="#CC0000", size=12, family="Arial"), opacity=0.85,
+    )
+    fig3.add_annotation(
+        x=72, y=28, text="AE gana", showarrow=False,
+        font=dict(color="#1f77b4", size=12, family="Arial"), opacity=0.85,
+    )
     fig3.update_layout(height=440)
     st.plotly_chart(fig3, use_container_width=True)
+    st.caption(
+        "Contexto nacional: cada punto = un municipio. "
+        "Línea punteada = empate (AE% = IC%). "
+        + (f"Resaltados {len(_sc3_hl)} municipios de {sel_dept}. "
+           if sel_dept not in ("Todos", EXTERIOR_LABEL) else "")
+        + f"AE gana en {(mun_interior['pct_AE'] >= mun_interior['pct_IC']).sum()} "
+          f"municipios, IC en {(mun_interior['pct_IC'] > mun_interior['pct_AE']).sum()}."
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # TAB 4 – FUERZA PALOMA
 # ═══════════════════════════════════════════════════════════════════════════════
-with t4:
+with t_fuerza_paloma:
     st.title("Donde fue fuerte Paloma Valencia Laserna")
 
     top_n = st.slider("Número de municipios", 10, 100, 30, key="slider_paloma")
@@ -1041,38 +1324,104 @@ with t4:
         orientation="h",
         labels={"pct_Valencia": "% Votos Paloma", "muni_label": "", "dept_nombre": "Depto."},
     )
+    _nac_pct_Val = mun_interior["pct_Valencia"].mean()
+    fig.add_vline(
+        x=_nac_pct_Val, line_dash="dash", line_color="gray", opacity=0.6,
+        annotation_text=f"Media nacional {_nac_pct_Val:.1f}%",
+        annotation_position="top right",
+    )
     fig.update_layout(
-        height=max(400, top_n * 20),
+        height=min(max(400, top_n * 22), 1400),
         margin=dict(l=0, r=20, t=10, b=0),
         yaxis={"categoryorder": "total ascending"},
     )
     st.plotly_chart(fig, use_container_width=True)
 
-    # Correlación Paloma ↔ AE y IC con tendencias
+    # Correlación Paloma ↔ AE y IC — contexto nacional, dept resaltado si hay filtro
+    _sc_pal_base = mun_interior.copy()
+    _sc_pal_base["muni_label"] = _sc_pal_base.apply(_muni_label, axis=1)
+    _r_pval_ae = mun_interior["pct_Valencia"].corr(mun_interior["pct_AE"])
+    _r_pval_ic = mun_interior["pct_Valencia"].corr(mun_interior["pct_IC"])
     st.subheader("Correlación Paloma con AE y con IC (por municipio)")
+
+    _pal_highlight = sel_dept not in ("Todos", EXTERIOR_LABEL)
+    if _pal_highlight:
+        _pal_bg = _sc_pal_base[_sc_pal_base["dept_nombre"] != sel_dept]
+        _pal_hl = _sc_pal_base[_sc_pal_base["dept_nombre"] == sel_dept]
+
     col_a, col_b = st.columns(2)
     with col_a:
-        fig2 = px.scatter(
-            mun_f, x="pct_Valencia", y="pct_AE",
-            color="dept_nombre", hover_name="muni_label", opacity=0.7,
-            hover_data={"dept_nombre": True},
-            labels={"pct_Valencia": "% Paloma", "pct_AE": "% Abelardo"},
-            title="Paloma vs Abelardo",
+        if _pal_highlight:
+            fig2 = go.Figure()
+            fig2.add_trace(go.Scatter(
+                x=_pal_bg["pct_Valencia"], y=_pal_bg["pct_AE"],
+                mode="markers", name="Otros",
+                marker=dict(color="#cccccc", opacity=0.2, size=4),
+                text=_pal_bg["muni_label"],
+                hovertemplate="%{text}<br>Paloma: %{x:.1f}%  AE: %{y:.1f}%<extra></extra>",
+            ))
+            fig2.add_trace(go.Scatter(
+                x=_pal_hl["pct_Valencia"], y=_pal_hl["pct_AE"],
+                mode="markers", name=sel_dept,
+                marker=dict(color="#1f77b4", opacity=0.9, size=7),
+                text=_pal_hl["muni_label"],
+                hovertemplate="%{text}<br>Paloma: %{x:.1f}%  AE: %{y:.1f}%<extra></extra>",
+            ))
+            add_trend(fig2, _sc_pal_base["pct_Valencia"], _sc_pal_base["pct_AE"], name="Tendencia nac.")
+            fig2.update_layout(xaxis_title="% Paloma", yaxis_title="% Abelardo")
+        else:
+            fig2 = px.scatter(
+                mun_f, x="pct_Valencia", y="pct_AE",
+                color="dept_nombre", hover_name="muni_label", opacity=0.7,
+                hover_data={"dept_nombre": True},
+                labels={"pct_Valencia": "% Paloma", "pct_AE": "% Abelardo"},
+            )
+            add_trend(fig2, mun_f["pct_Valencia"], mun_f["pct_AE"], name="Tendencia")
+        fig2.update_layout(
+            showlegend=False,
+            title=f"Paloma vs Abelardo  (r = {_r_pval_ae:+.2f})",
         )
-        add_trend(fig2, mun_f["pct_Valencia"], mun_f["pct_AE"], name="Tendencia")
-        fig2.update_layout(showlegend=False)
         st.plotly_chart(fig2, use_container_width=True)
+
     with col_b:
-        fig3 = px.scatter(
-            mun_f, x="pct_Valencia", y="pct_IC",
-            color="dept_nombre", hover_name="muni_label", opacity=0.7,
-            hover_data={"dept_nombre": True},
-            labels={"pct_Valencia": "% Paloma", "pct_IC": "% Cepeda"},
-            title="Paloma vs Cepeda",
+        if _pal_highlight:
+            fig3 = go.Figure()
+            fig3.add_trace(go.Scatter(
+                x=_pal_bg["pct_Valencia"], y=_pal_bg["pct_IC"],
+                mode="markers", name="Otros",
+                marker=dict(color="#cccccc", opacity=0.2, size=4),
+                text=_pal_bg["muni_label"],
+                hovertemplate="%{text}<br>Paloma: %{x:.1f}%  IC: %{y:.1f}%<extra></extra>",
+            ))
+            fig3.add_trace(go.Scatter(
+                x=_pal_hl["pct_Valencia"], y=_pal_hl["pct_IC"],
+                mode="markers", name=sel_dept,
+                marker=dict(color="#CC0000", opacity=0.9, size=7),
+                text=_pal_hl["muni_label"],
+                hovertemplate="%{text}<br>Paloma: %{x:.1f}%  IC: %{y:.1f}%<extra></extra>",
+            ))
+            add_trend(fig3, _sc_pal_base["pct_Valencia"], _sc_pal_base["pct_IC"], name="Tendencia nac.")
+            fig3.update_layout(xaxis_title="% Paloma", yaxis_title="% Cepeda")
+        else:
+            fig3 = px.scatter(
+                mun_f, x="pct_Valencia", y="pct_IC",
+                color="dept_nombre", hover_name="muni_label", opacity=0.7,
+                hover_data={"dept_nombre": True},
+                labels={"pct_Valencia": "% Paloma", "pct_IC": "% Cepeda"},
+            )
+            add_trend(fig3, mun_f["pct_Valencia"], mun_f["pct_IC"], name="Tendencia")
+        fig3.update_layout(
+            showlegend=False,
+            title=f"Paloma vs Cepeda  (r = {_r_pval_ic:+.2f})",
         )
-        add_trend(fig3, mun_f["pct_Valencia"], mun_f["pct_IC"], name="Tendencia")
-        fig3.update_layout(showlegend=False)
         st.plotly_chart(fig3, use_container_width=True)
+
+    st.caption(
+        "r > 0: relación positiva (donde Paloma es fuerte, ese candidato también). "
+        "r < 0: relación negativa. "
+        "Paloma y AE comparten electorado de derecha; Paloma y Cepeda son opuestos ideológicos. "
+        "Contexto nacional siempre visible; el departamento seleccionado se resalta en color."
+    )
 
     st.subheader("Datos")
     top_show = top[["dept_nombre", "muni_label", "votos_Valencia", "pct_Valencia",
@@ -1089,7 +1438,7 @@ with t4:
 # ═══════════════════════════════════════════════════════════════════════════════
 # TAB 5 – ANÁLISIS COALICIÓN
 # ═══════════════════════════════════════════════════════════════════════════════
-with t5:
+with t_coalicion:
     st.title("Análisis Coalición – Constructor de escenarios")
 
     # ── Configurar escenario ─────────────────────────────────────────────────
@@ -1113,6 +1462,7 @@ with t5:
             coal_opts, index=2, horizontal=True, key="coal_claudia",
         )
     st.caption("* Claudia López: solo total nacional disponible, sin desglose municipal")
+    st.caption("Referencia 2022 (primera vuelta): Petro 40.3% · Rodolfo Hernández 28.2% · F. Gutiérrez 23.9% · Fajardo 4.2%")
 
     # ── Calcular coalición dinámica ─────────────────────────────────────────
     CLAUDIA_VOTOS = 225_335
@@ -1249,6 +1599,101 @@ with t5:
     )
     st.plotly_chart(fig_dept, use_container_width=True)
 
+    # ── Mapas departamentos: original vs coalición ───────────────────────────
+    st.subheader("Mapa por departamento: 1ª vuelta vs Escenario coalición")
+    _dept_coal_map = dept_coal.copy()
+    _dept_coal_map["divipola"] = _dept_coal_map["dept_nombre"].map(DEPT_TO_DIVIPOLA)
+    _dept_coal_map = _dept_coal_map.dropna(subset=["divipola"])
+
+    # Ganador original por departamento
+    _dept_orig_map = (mun_coal_int.groupby("dept_nombre", as_index=False)
+                                  .agg(votos_AE=("votos_AE", "sum"),
+                                       votos_IC=("votos_IC", "sum")))
+    _dept_orig_map["ganador_orig"] = _dept_orig_map.apply(
+        lambda r: "ABELARDO" if r["votos_AE"] > r["votos_IC"] else "CEPEDA", axis=1
+    )
+    _dept_orig_map["divipola"] = _dept_orig_map["dept_nombre"].map(DEPT_TO_DIVIPOLA)
+    _dept_orig_map = _dept_orig_map.dropna(subset=["divipola"])
+
+    _GANADOR_COAL_COLORS = {"COALICIÓN AE": "#2ca02c", "CEPEDA": "#CC0000"}
+    _GANADOR_ORIG_COLORS = {"ABELARDO": "#1f77b4",    "CEPEDA": "#CC0000"}
+
+    def _dept_choropleth(df, color_col, color_map, title):
+        fig = px.choropleth(
+            df, geojson=geo_depts, locations="divipola",
+            featureidkey="properties.DPTO",
+            color=color_col, color_discrete_map=color_map,
+            hover_name="dept_nombre",
+            labels={color_col: "Ganador"},
+            title=title,
+        )
+        fig.update_geos(fitbounds="locations", visible=False)
+        fig.update_layout(
+            height=420, margin=dict(l=0, r=0, t=30, b=0),
+            paper_bgcolor="rgba(0,0,0,0)",
+            geo=dict(bgcolor="rgba(0,0,0,0)"),
+            dragmode=False,
+        )
+        return fig
+
+    _col_dm1, _col_dm2 = st.columns(2)
+    with _col_dm1:
+        st.caption("Primera vuelta (sin coalición)")
+        fig_dmap_orig = _dept_choropleth(
+            _dept_orig_map, "ganador_orig", _GANADOR_ORIG_COLORS, "1ª Vuelta"
+        )
+        st.plotly_chart(fig_dmap_orig, use_container_width=True, config=_MAP_CFG)
+    with _col_dm2:
+        st.caption("Con coalición seleccionada")
+        fig_dmap = _dept_choropleth(
+            _dept_coal_map, "ganador_coal", _GANADOR_COAL_COLORS, "Coalición"
+        )
+        st.plotly_chart(fig_dmap, use_container_width=True, config=_MAP_CFG)
+
+    # ── Mapas municipios: original vs coalición ──────────────────────────────
+    st.subheader("Mapa por municipio: 1ª vuelta vs Escenario coalición")
+    _mun_coal_map = mun_coal[
+        (mun_coal["dept_nombre"] != "CONSULADOS") &
+        (mun_coal["divipola_muni"].astype(str) != "")
+    ].copy()
+    _mun_coal_map["ganador_coal_label"] = _mun_coal_map["gana_coal"].map(
+        {1: "COALICIÓN AE", 0: "CEPEDA"}
+    )
+
+    def _muni_choropleth(df, color_col, color_map, title):
+        fig = px.choropleth(
+            df, geojson=geo_munis, locations="divipola_muni",
+            featureidkey="properties.MPIO_CCNCT",
+            color=color_col, color_discrete_map=color_map,
+            hover_name="muni_nombre",
+            hover_data={"dept_nombre": True, "votos_AE": ":,",
+                        "votos_IC": ":,", "divipola_muni": False},
+            labels={color_col: "Ganador"},
+            title=title,
+        )
+        fig.update_geos(fitbounds="locations", visible=False)
+        fig.update_layout(
+            height=560, margin=dict(l=0, r=0, t=30, b=0),
+            paper_bgcolor="rgba(0,0,0,0)",
+            geo=dict(bgcolor="rgba(0,0,0,0)"),
+            dragmode=False,
+        )
+        return fig
+
+    _col_mm1, _col_mm2 = st.columns(2)
+    with _col_mm1:
+        st.caption("Primera vuelta (sin coalición)")
+        fig_mmap_orig = _muni_choropleth(
+            _mun_coal_map, "ganador", _GANADOR_ORIG_COLORS, "1ª Vuelta"
+        )
+        st.plotly_chart(fig_mmap_orig, use_container_width=True, config=_MAP_CFG)
+    with _col_mm2:
+        st.caption("Con coalición seleccionada")
+        fig_mmap = _muni_choropleth(
+            _mun_coal_map, "ganador_coal_label", _GANADOR_COAL_COLORS, "Coalición"
+        )
+        st.plotly_chart(fig_mmap, use_container_width=True, config=_MAP_CFG)
+
     # ── Municipios revertidos ────────────────────────────────────────────────
     st.subheader("Municipios donde la coalición revierte el resultado")
 
@@ -1279,7 +1724,7 @@ with t5:
 # ═══════════════════════════════════════════════════════════════════════════════
 # TAB 6 – PROYECCIÓN 2ª VUELTA
 # ═══════════════════════════════════════════════════════════════════════════════
-with t6:
+with t_proyeccion:
     st.title("Proyección Segunda Vuelta")
 
     st.markdown("""
@@ -1365,8 +1810,46 @@ with t6:
 
     ae_extra = sum(v1[f] * taus[f][0] for f in fuentes)
     ic_extra = sum(v1[f] * taus[f][1] for f in fuentes)
-    ae_total = ae_base + ae_extra
-    ic_total = ic_base + ic_extra
+
+    # ── Nuevos votantes segunda vuelta ───────────────────────────────────────
+    st.divider()
+    st.subheader("Nuevos votantes en segunda vuelta")
+    st.caption(
+        "En segunda vuelta suelen participar entre 1 y 2 millones de personas adicionales "
+        "que no votaron en la primera. Ajusta cuántos llegan y cómo se reparten."
+    )
+
+    if "nuevos_total" not in st.session_state:
+        st.session_state["nuevos_total"] = 1_500_000
+    if "nuevos_ae_pct" not in st.session_state:
+        st.session_state["nuevos_ae_pct"] = 48
+
+    cn1, cn2 = st.columns(2)
+    with cn1:
+        nuevos_total = st.slider(
+            "Nuevos votantes adicionales",
+            min_value=500_000, max_value=3_000_000,
+            step=50_000, key="nuevos_total",
+            format="%,d",
+            help="Votantes que no participaron en primera vuelta pero sí en segunda",
+        )
+    with cn2:
+        nuevos_ae_pct = st.slider(
+            "% de nuevos votos para Abelardo",
+            min_value=0, max_value=100,
+            step=1, key="nuevos_ae_pct",
+            help="El resto va a Cepeda. En segunda vuelta no hay candidatos menores.",
+        )
+
+    nuevos_ae  = int(nuevos_total * nuevos_ae_pct / 100)
+    nuevos_ic  = nuevos_total - nuevos_ae
+    st.caption(
+        f"Nuevos votos: AE **{nuevos_ae:,}** · IC **{nuevos_ic:,}** "
+        f"(total nuevos: **{nuevos_total:,}**)"
+    )
+
+    ae_total = ae_base + ae_extra + nuevos_ae
+    ic_total = ic_base + ic_extra + nuevos_ic
     total    = ae_total + ic_total
     ae_pct   = ae_total / total * 100
     ic_pct   = ic_total / total * 100
@@ -1389,27 +1872,48 @@ with t6:
     )
 
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("ABELARDO – 1ª Vuelta",  f"{ae_base:,}")
-    c2.metric("ABELARDO – Votos extra", f"+{int(ae_extra):,}")
-    c3.metric("CEPEDA – 1ª Vuelta",    f"{ic_base:,}")
-    c4.metric("CEPEDA – Votos extra",   f"+{int(ic_extra):,}")
+    c1.metric("ABELARDO – 1ª Vuelta",    f"{ae_base:,}")
+    c2.metric("ABELARDO – Transferencias", f"+{int(ae_extra):,}")
+    c3.metric("CEPEDA – 1ª Vuelta",      f"{ic_base:,}")
+    c4.metric("CEPEDA – Transferencias",  f"+{int(ic_extra):,}")
 
-    c5, c6 = st.columns(2)
-    c5.metric("ABELARDO TOTAL", f"{ae_total:,.0f}", f"{ae_pct:.1f}%")
-    c6.metric("CEPEDA TOTAL",   f"{ic_total:,.0f}", f"{ic_pct:.1f}%")
+    c5, c6, c7, c8 = st.columns(4)
+    c5.metric("ABELARDO – Nuevos",  f"+{nuevos_ae:,}")
+    c6.metric("ABELARDO TOTAL",     f"{ae_total:,.0f}", f"{ae_pct:.1f}%")
+    c7.metric("CEPEDA – Nuevos",    f"+{nuevos_ic:,}")
+    c8.metric("CEPEDA TOTAL",       f"{ic_total:,.0f}", f"{ic_pct:.1f}%")
 
     fig = go.Figure()
-    fig.add_bar(name="Primera vuelta",
+    fig.add_bar(name="1ª vuelta",
                 x=["ABELARDO", "CEPEDA"],
                 y=[ae_base, ic_base],
-                marker_color=["#1f77b4", "#CC0000"], opacity=0.5)
-    fig.add_bar(name="Segunda vuelta proyectada",
+                marker_color=["#1f77b4", "#CC0000"], opacity=0.45,
+                text=[f"{ae_base:,}", f"{ic_base:,}"],
+                textposition="inside")
+    fig.add_bar(name="+ Transferencias",
                 x=["ABELARDO", "CEPEDA"],
-                y=[ae_total, ic_total],
-                marker_color=["#1f77b4", "#CC0000"], opacity=1.0)
-    fig.update_layout(barmode="group", height=400,
-                      yaxis_title="Votos",
-                      title="Primera vs Segunda Vuelta (proyección)")
+                y=[int(ae_extra), int(ic_extra)],
+                marker_color=["#5fa8e0", "#e06060"], opacity=0.85,
+                text=[f"+{int(ae_extra):,}", f"+{int(ic_extra):,}"],
+                textposition="inside")
+    fig.add_bar(name=f"+ Nuevos votantes ({nuevos_total/1e6:.1f}M)",
+                x=["ABELARDO", "CEPEDA"],
+                y=[nuevos_ae, nuevos_ic],
+                marker_color=["#aad4f5", "#f5aaaa"], opacity=0.95,
+                text=[f"+{nuevos_ae:,}", f"+{nuevos_ic:,}"],
+                textposition="inside")
+    fig.update_layout(
+        barmode="stack", height=480,
+        yaxis_title="Votos",
+        title="Segunda Vuelta proyectada – Composición de votos",
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        annotations=[
+            dict(x="ABELARDO", y=ae_total, text=f"<b>{ae_total:,}</b> ({ae_pct:.1f}%)",
+                 showarrow=False, yanchor="bottom", font=dict(size=13, color="#1f77b4")),
+            dict(x="CEPEDA",   y=ic_total, text=f"<b>{ic_total:,}</b> ({ic_pct:.1f}%)",
+                 showarrow=False, yanchor="bottom", font=dict(size=13, color="#CC0000")),
+        ],
+    )
     st.plotly_chart(fig, use_container_width=True)
 
     st.subheader("Detalle de transferencias")
@@ -1424,10 +1928,24 @@ with t6:
             "Abstención":   f"{v1[f]*t_abs:,.0f}  ({t_abs*100:.0f}%)",
         })
     rows.append({
-        "Fuente":     "TOTAL EXTRA",
+        "Fuente":     "TOTAL TRANSFERENCIAS",
         "Votos 1ª":   f"{sum(v1.values()):,}",
         "→ AE":       f"{ae_extra:,.0f}",
         "→ IC":       f"{ic_extra:,.0f}",
+        "Abstención": "",
+    })
+    rows.append({
+        "Fuente":     f"NUEVOS VOTANTES 2ª vuelta ({nuevos_total:,})",
+        "Votos 1ª":   "—",
+        "→ AE":       f"{nuevos_ae:,}  ({nuevos_ae_pct}%)",
+        "→ IC":       f"{nuevos_ic:,}  ({100-nuevos_ae_pct}%)",
+        "Abstención": "—",
+    })
+    rows.append({
+        "Fuente":     "TOTAL PROYECTADO",
+        "Votos 1ª":   f"{ae_base + ic_base:,}",
+        "→ AE":       f"{ae_total:,.0f}  ({ae_pct:.1f}%)",
+        "→ IC":       f"{ic_total:,.0f}  ({ic_pct:.1f}%)",
         "Abstención": "",
     })
     st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
@@ -1436,7 +1954,7 @@ with t6:
 # ═══════════════════════════════════════════════════════════════════════════════
 # TAB 7 – SOLO ANTIOQUIA
 # ═══════════════════════════════════════════════════════════════════════════════
-with t7:
+with t_antioquia:
     st.title("Análisis Detallado – Antioquia")
 
     ant = mun[mun["dept_co"] == 1].copy()
@@ -1565,24 +2083,39 @@ with t7:
                                  yaxis={"categoryorder": "total ascending"})
             st.plotly_chart(fig_ti, use_container_width=True)
 
-        # ── Scatter AE vs IC en Antioquia ─────────────────────────────────
-        st.subheader("% AE vs % IC por municipio (Antioquia)")
+        # ── Scatter Margen AE−IC vs Participación ─────────────────────────
+        ant_sc = ant.copy()
+        ant_sc["margen_AE"] = ant_sc["pct_AE"] - ant_sc["pct_IC"]
+        _r_ant_margen = ant_sc["margen_AE"].corr(ant_sc["pct_participacion"])
+        st.subheader(f"Margen AE−IC vs Participación – Antioquia  (r = {_r_ant_margen:+.2f})")
         fig_sc = px.scatter(
-            ant, x="pct_AE", y="pct_IC",
+            ant_sc, x="margen_AE", y="pct_participacion",
             hover_name="muni_nombre",
-            hover_data={"votos_AE": ":,", "votos_IC": ":,"},
+            hover_data={
+                "margen_AE": ":.1f",
+                "pct_participacion": ":.1f",
+                "votos_AE": ":,",
+                "votos_IC": ":,",
+                "ganador": True,
+            },
             color="ganador",
             color_discrete_map=GANADOR_COLORS,
-            labels={"pct_AE": "% Abelardo", "pct_IC": "% Cepeda", "ganador": "Ganador"},
+            labels={
+                "margen_AE": "Margen AE − IC (pp)",
+                "pct_participacion": "% Participación",
+                "ganador": "Ganador",
+            },
             opacity=0.75,
             size="votos_AE",
         )
-        fig_sc.add_shape(
-            type="line", x0=0, y0=0, x1=100, y1=100,
-            line=dict(dash="dash", color="gray", width=1),
+        fig_sc.add_vline(x=0, line_dash="dot", line_color="gray", opacity=0.5)
+        add_trend(fig_sc, ant_sc["margen_AE"], ant_sc["pct_participacion"], color="black", name="Tendencia")
+        fig_sc.update_layout(
+            height=450,
+            xaxis_title="Margen AE − IC (puntos porcentuales)",
+            yaxis_title="% Participación",
+            title="Margen AE−IC vs Participación – Municipios Antioquia",
         )
-        add_trend(fig_sc, ant["pct_AE"], ant["pct_IC"], name="Tendencia")
-        fig_sc.update_layout(height=450)
         st.plotly_chart(fig_sc, use_container_width=True)
 
         # ── Tabla coalición Antioquia ─────────────────────────────────────
@@ -1636,3 +2169,11 @@ with t7:
             "Dif AE-IC", "Ganador",
         ]
         st.dataframe(tabla_ant, use_container_width=True, hide_index=True)
+
+# ── Pie de página ─────────────────────────────────────────────────────────────
+st.divider()
+st.caption(
+    "Fuente: Registraduría Nacional del Estado Civil – Preconteo 31 mayo 2026 · "
+    "Datos actualizados al 99.92% de mesas informadas · "
+    "Código: github.com/carfmono/elecciones-2026"
+)
