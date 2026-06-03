@@ -1812,67 +1812,102 @@ with t_proyeccion:
     # ── Encuestas 2ª vuelta ──────────────────────────────────────────────────
     st.subheader("Encuestas publicadas – 2ª vuelta")
 
-    _POLLS = [
-        # (firma, fecha_pub, AE%, IC%, blanco_ns%, muestra, nota)
-        ("Invamer",          "abr-2026", 40.4, 40.6,  19.0,  None,  "Pre-1ª vuelta · escenario hipotético AE vs IC"),
-        ("CNC",              "may-2026", 43.6, 40.9,  15.5,  None,  "Pre-1ª vuelta · escenario hipotético"),
-        ("Guarumo / EcoAna", "may-2026", 43.6, 40.0,  16.4,  None,  "Pre-1ª vuelta · ninguno=16.4%"),
-        ("AtlasIntel",       "may-2026", 50.0, 41.3,   8.7,  None,  "Pre-1ª vuelta · escenario 2v"),
-        ("AtlasIntel",       "1-2 jun",  50.3, 42.6,   7.1,  2030,  "Post-1ª vuelta · blanco 3.7%, NS 2.9% · ±2% IC 95%"),
+    # Datos con fechas reales para serie de tiempo
+    # (firma, fecha ISO, AE%, IC%, nota)
+    _POLLS_TS = [
+        ("Invamer",          "2026-04-15", 40.4, 40.6, "Escenario hipotético AE vs IC"),
+        ("CNC",              "2026-05-10", 43.6, 40.9, "Escenario hipotético"),
+        ("Guarumo / EcoAna", "2026-05-15", 43.6, 40.0, "Ninguno/Blanco: 16.4%"),
+        ("AtlasIntel",       "2026-05-20", 50.0, 41.3, "Pre-1ª vuelta"),
+        ("AtlasIntel",       "2026-06-02", 50.3, 42.6, "Post-1ª vuelta · n=2030 · ±2%"),
+        # Resultado real 1ª vuelta como referencia
+        ("Resultado 1ª vuelta", "2026-05-31", 43.74, 40.90, "Resultado oficial Registraduría"),
     ]
-    _poll_df = pd.DataFrame(_POLLS, columns=["Firma", "Fecha", "AE%", "IC%", "Otros/NS%", "Muestra", "Nota"])
+    _poll_df = pd.DataFrame(_POLLS_TS, columns=["Firma", "Fecha", "AE%", "IC%", "Nota"])
+    _poll_df["Fecha"] = pd.to_datetime(_poll_df["Fecha"])
+    _poll_df["Margen"] = _poll_df["AE%"] - _poll_df["IC%"]
 
-    # Normalizar AE vs IC (excluyendo blancos/NS)
-    _poll_df["AE% norm"] = (_poll_df["AE%"] / (_poll_df["AE%"] + _poll_df["IC%"]) * 100).round(1)
-    _poll_df["IC% norm"] = 100 - _poll_df["AE% norm"]
-    _poll_df["Margen AE-IC"] = (_poll_df["AE%"] - _poll_df["IC%"]).round(1).apply(lambda v: f"{v:+.1f} pp")
+    # Colores por firma
+    _FIRMA_COLORS = {
+        "Invamer":             "#f0a500",
+        "CNC":                 "#9467bd",
+        "Guarumo / EcoAna":    "#17becf",
+        "AtlasIntel":          "#2ca02c",
+        "Resultado 1ª vuelta": "#C8A96E",
+    }
+    _FIRMA_DASH = {
+        "Resultado 1ª vuelta": "dot",
+    }
 
-    # Gráfico de encuestas
-    _fig_polls = go.Figure()
-    _firms = _poll_df["Firma"].tolist()
-    _labels = [f"{r['Firma']}<br>{r['Fecha']}" for _, r in _poll_df.iterrows()]
+    # ── Serie de tiempo: AE% y IC% por encuestadora ──────────────────────────
+    _fig_ts = go.Figure()
+    for firma, grp in _poll_df.groupby("Firma", sort=False):
+        grp = grp.sort_values("Fecha")
+        color = _FIRMA_COLORS.get(firma, "#aaaaaa")
+        dash  = _FIRMA_DASH.get(firma, "solid")
+        sym   = "diamond" if firma == "Resultado 1ª vuelta" else "circle"
+        _fig_ts.add_trace(go.Scatter(
+            x=grp["Fecha"], y=grp["AE%"],
+            mode="lines+markers+text",
+            name=f"{firma} – AE",
+            line=dict(color=color, dash=dash, width=2),
+            marker=dict(color=color, size=9, symbol=sym),
+            text=grp["AE%"].apply(lambda v: f"{v:.1f}"),
+            textposition="top center",
+            legendgroup=firma,
+            hovertemplate=f"<b>{firma}</b><br>%{{x|%d %b}}<br>AE: %{{y:.1f}}%<br><extra></extra>",
+        ))
+        _fig_ts.add_trace(go.Scatter(
+            x=grp["Fecha"], y=grp["IC%"],
+            mode="lines+markers+text",
+            name=f"{firma} – IC",
+            line=dict(color=color, dash="dash" if dash == "solid" else "dot", width=1.5),
+            marker=dict(color=color, size=7, symbol=sym, opacity=0.6),
+            text=grp["IC%"].apply(lambda v: f"{v:.1f}"),
+            textposition="bottom center",
+            legendgroup=firma,
+            showlegend=True,
+            hovertemplate=f"<b>{firma}</b><br>%{{x|%d %b}}<br>IC: %{{y:.1f}}%<br><extra></extra>",
+        ))
 
-    _fig_polls.add_trace(go.Bar(
-        name="AE (bruto)", x=_labels, y=_poll_df["AE%"],
-        marker_color="#1f77b4", text=_poll_df["AE%"].apply(lambda v: f"{v:.1f}%"),
-        textposition="outside",
-    ))
-    _fig_polls.add_trace(go.Bar(
-        name="IC (bruto)", x=_labels, y=_poll_df["IC%"],
-        marker_color="#CC0000", text=_poll_df["IC%"].apply(lambda v: f"{v:.1f}%"),
-        textposition="outside",
-    ))
-    _fig_polls.add_hline(y=50, line_dash="dot", line_color="#C8A96E",
-                         annotation_text="50% mayoría", annotation_position="right")
-    _fig_polls.update_layout(
-        barmode="group", height=400,
-        title="Intención de voto 2ª vuelta por encuestadora (% bruto)",
+    _fig_ts.add_hline(y=50, line_dash="dot", line_color="#C8A96E",
+                      annotation_text="50% mayoría", annotation_position="top right")
+    _fig_ts.update_layout(
+        height=480,
+        title="Intención de voto 2ª vuelta – Serie de tiempo por encuestadora",
         xaxis_title="", yaxis_title="% intención de voto",
-        yaxis_range=[30, 60],
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        margin=dict(t=60, b=20),
+        yaxis_range=[35, 58],
+        xaxis=dict(tickformat="%d %b", dtick="M0.5"),
+        legend=dict(orientation="h", yanchor="bottom", y=-0.35, xanchor="left", x=0, font_size=10),
+        margin=dict(t=50, b=120),
     )
-    st.plotly_chart(_fig_polls, use_container_width=True)
+    st.plotly_chart(_fig_ts, use_container_width=True)
 
-    # Gráfico de evolución del margen
+    # ── Margen AE-IC por encuestadora en el tiempo ────────────────────────────
+    st.subheader("Margen AE − IC en el tiempo (pp)")
     _fig_margen = go.Figure()
-    _margenes = (_poll_df["AE%"] - _poll_df["IC%"]).tolist()
-    _fig_margen.add_trace(go.Scatter(
-        x=_labels, y=_margenes,
-        mode="lines+markers+text",
-        text=[f"{v:+.1f}" for v in _margenes],
-        textposition="top center",
-        marker_color=["#1f77b4" if v > 0 else "#CC0000" for v in _margenes],
-        marker_size=10,
-        line_color="#C8A96E",
-        name="Margen AE − IC",
-    ))
-    _fig_margen.add_hline(y=0, line_dash="dash", line_color="#666666",
+    for firma, grp in _poll_df.groupby("Firma", sort=False):
+        grp = grp.sort_values("Fecha")
+        color = _FIRMA_COLORS.get(firma, "#aaaaaa")
+        sym   = "diamond" if firma == "Resultado 1ª vuelta" else "circle"
+        _fig_margen.add_trace(go.Scatter(
+            x=grp["Fecha"], y=grp["Margen"],
+            mode="lines+markers+text",
+            name=firma,
+            line=dict(color=color, width=2),
+            marker=dict(color=color, size=10, symbol=sym),
+            text=grp["Margen"].apply(lambda v: f"{v:+.1f}"),
+            textposition="top center",
+            hovertemplate=f"<b>{firma}</b><br>%{{x|%d %b}}<br>Margen: %{{y:+.1f}} pp<extra></extra>",
+        ))
+    _fig_margen.add_hline(y=0, line_dash="dash", line_color="#555555",
                           annotation_text="Empate", annotation_position="right")
     _fig_margen.update_layout(
-        height=300, title="Evolución del margen AE − IC por encuesta (pp)",
-        yaxis_title="pp (positivo = AE lidera)", showlegend=False,
-        margin=dict(t=50, b=20),
+        height=320,
+        xaxis=dict(tickformat="%d %b"),
+        yaxis_title="pp (+ = AE lidera)",
+        legend=dict(orientation="h", yanchor="bottom", y=-0.4, xanchor="left", x=0, font_size=10),
+        margin=dict(t=20, b=100),
     )
     st.plotly_chart(_fig_margen, use_container_width=True)
 
