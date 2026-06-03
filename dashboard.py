@@ -1831,9 +1831,13 @@ with t_proyeccion:
         ("Resultado 1ª vuelta", "2026-05-31", 43.74, 40.90, "Resultado oficial Registraduría"),
     ]
     _poll_df = pd.DataFrame(_POLLS_TS, columns=["Firma", "Fecha", "AE%", "IC%", "Nota"])
+    _MES_ES = {1:"Ene",2:"Feb",3:"Mar",4:"Abr",5:"May",6:"Jun",
+               7:"Jul",8:"Ago",9:"Sep",10:"Oct",11:"Nov",12:"Dic"}
     _poll_df["Fecha"]     = pd.to_datetime(_poll_df["Fecha"])
-    _poll_df["Mes"]       = _poll_df["Fecha"].dt.strftime("%b %Y")   # "Abr 2026", "May 2026", "Jun 2026"
     _poll_df["Mes_orden"] = _poll_df["Fecha"].dt.to_period("M").apply(lambda p: p.ordinal)
+    _poll_df["Mes"]       = _poll_df["Fecha"].apply(
+        lambda d: f"{_MES_ES[d.month]} {d.year}"
+    )
     _poll_df["Margen"]    = _poll_df["AE%"] - _poll_df["IC%"]
 
     # Para la serie mensual: si una firma tiene varias encuestas en el mismo mes, promedio
@@ -1842,7 +1846,9 @@ with t_proyeccion:
         .agg({"AE%": "mean", "IC%": "mean", "Margen": "mean"})
         .sort_values("Mes_orden")
     )
-    _MES_ORDER = _poll_monthly["Mes"].drop_duplicates().sort_values().tolist()
+    # Orden cronológico correcto (no alfabético)
+    _MES_ORDER = (_poll_monthly.drop_duplicates("Mes")
+                  .sort_values("Mes_orden")["Mes"].tolist())
 
     # Colores por firma
     _FIRMA_COLORS = {
