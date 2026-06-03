@@ -1812,15 +1812,22 @@ with t_proyeccion:
     # ── Encuestas 2ª vuelta ──────────────────────────────────────────────────
     st.subheader("Encuestas publicadas – 2ª vuelta")
 
-    # Datos con fechas reales para serie de tiempo
-    # (firma, fecha ISO, AE%, IC%, nota)
+    # Datos con fechas reales para serie de tiempo — escenario 2ª vuelta AE vs IC
+    # Fuentes: Invamer/Caracol-BluRadio, AtlasIntel/Semana, CNC, Guarumo/EcoAna,
+    #          TempoGroup/Infobae, Registraduría
     _POLLS_TS = [
-        ("Invamer",          "2026-04-15", 40.4, 40.6, "Escenario hipotético AE vs IC"),
-        ("CNC",              "2026-05-10", 43.6, 40.9, "Escenario hipotético"),
-        ("Guarumo / EcoAna", "2026-05-15", 43.6, 40.0, "Ninguno/Blanco: 16.4%"),
-        ("AtlasIntel",       "2026-05-20", 50.0, 41.3, "Pre-1ª vuelta"),
-        ("AtlasIntel",       "2026-06-02", 50.3, 42.6, "Post-1ª vuelta · n=2030 · ±2%"),
-        # Resultado real 1ª vuelta como referencia
+        # Invamer (abr 15-24): AE 42.6 vs IC 54.6  — artículo menciona +5.2pp desde feb → feb≈37.4
+        ("Invamer",             "2026-02-15", 37.4, 59.4, "Estimado desde delta (+5.2pp a abr)"),
+        ("Invamer",             "2026-04-20", 42.6, 54.6, "n=3800 · ±1.89% · 149 municipios"),
+        # AtlasIntel
+        ("AtlasIntel",          "2026-05-12", 44.0, 40.4, "May 9-14 · pre-1ª vuelta"),
+        ("AtlasIntel",          "2026-05-20", 50.0, 41.3, "May 18-21 · suspensión CNE levantada"),
+        ("AtlasIntel",          "2026-06-02", 50.3, 42.6, "Jun 1-2 · post-1ª vuelta · n=2030 · ±2%"),
+        # CNC / Guarumo / TempoGroup
+        ("CNC",                 "2026-05-19", 43.6, 40.9, "May 16-22"),
+        ("Guarumo / EcoAna",    "2026-05-15", 43.6, 40.0, "Ninguno: 16.4%"),
+        ("TempoGroup",          "2026-05-23", 36.0, 42.4, "Blanco 11.8% + indecisos 9.9%"),
+        # Resultado oficial 1ª vuelta como referencia
         ("Resultado 1ª vuelta", "2026-05-31", 43.74, 40.90, "Resultado oficial Registraduría"),
     ]
     _poll_df = pd.DataFrame(_POLLS_TS, columns=["Firma", "Fecha", "AE%", "IC%", "Nota"])
@@ -1843,6 +1850,7 @@ with t_proyeccion:
         "CNC":                 "#9467bd",
         "Guarumo / EcoAna":    "#17becf",
         "AtlasIntel":          "#2ca02c",
+        "TempoGroup":          "#e377c2",
         "Resultado 1ª vuelta": "#C8A96E",
     }
     _FIRMA_DASH = {
@@ -1860,9 +1868,10 @@ with t_proyeccion:
             x=grp["Mes"], y=grp["AE%"],
             mode="lines+markers+text",
             name=f"{firma}",
-            line=dict(color=color, dash=dash, width=2),
-            marker=dict(color=color, size=9, symbol=sym),
+            line=dict(color=color, dash=dash, width=3),
+            marker=dict(color=color, size=14, symbol=sym, line=dict(width=2, color="#0A0A0A")),
             text=grp["AE%"].apply(lambda v: f"{v:.1f}"),
+            textfont=dict(size=13, color=color),
             textposition="top center",
             legendgroup=firma,
             hovertemplate=f"<b>{firma}</b><br>Abelardo: %{{y:.1f}}%<extra></extra>",
@@ -1874,10 +1883,11 @@ with t_proyeccion:
         height=420,
         title="Abelardo De La Espriella – intención de voto 2ª vuelta por encuestadora",
         xaxis=dict(categoryorder="array", categoryarray=_MES_ORDER, title=""),
-        yaxis=dict(title="% intención de voto", range=[35, 58]),
+        yaxis=dict(title="% intención de voto", range=[30, 58]),
         legend=dict(orientation="h", yanchor="bottom", y=-0.35, xanchor="left", x=0, font_size=10),
         margin=dict(t=50, b=120),
     )
+    st.caption("* Dato Invamer feb-2026 estimado a partir del delta reportado (+5.2 pp a abril). TempoGroup incluye alto porcentaje de indecisos/blanco (21.7%).")
     st.plotly_chart(_fig_ts, use_container_width=True)
 
     # ── Margen AE-IC por encuestadora mensual ─────────────────────────────────
@@ -1891,9 +1901,10 @@ with t_proyeccion:
             x=grp["Mes"], y=grp["Margen"],
             mode="lines+markers+text",
             name=firma,
-            line=dict(color=color, width=2),
-            marker=dict(color=color, size=10, symbol=sym),
+            line=dict(color=color, width=3),
+            marker=dict(color=color, size=14, symbol=sym, line=dict(width=2, color="#0A0A0A")),
             text=grp["Margen"].apply(lambda v: f"{v:+.1f}"),
+            textfont=dict(size=13, color=color),
             textposition="top center",
             hovertemplate=f"<b>{firma}</b><br>Margen Abelardo−Cepeda: %{{y:+.1f}} pp<extra></extra>",
         ))
