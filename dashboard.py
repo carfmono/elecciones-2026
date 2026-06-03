@@ -1180,7 +1180,17 @@ with t_depts:
         },
         orientation="h",
         barmode="stack",
+        custom_data=["votos"],
     )
+    # Mostrar votos de Abelardo como etiqueta dentro de su barra
+    for trace in fig.data:
+        if trace.name == "ABELARDO DE LA ESPRIELLA":
+            trace.text = [f"{int(v):,}" for v in trace.customdata[:, 0]]
+            trace.textposition = "inside"
+            trace.textfont = dict(size=10, color="#FFFFFF")
+            trace.insidetextanchor = "middle"
+        else:
+            trace.text = None
     fig.update_layout(
         height=620,
         legend_title="Candidato",
