@@ -1182,12 +1182,17 @@ with t_depts:
         barmode="stack",
         custom_data=["votos"],
     )
-    # Mostrar votos de Abelardo como etiqueta dentro de su barra
+    # Etiquetas de votos dentro de cada barra (solo candidatos con barra suficientemente ancha)
+    _label_cands = {
+        "ABELARDO DE LA ESPRIELLA": dict(size=16, color="#FFFFFF"),
+        "IVÁN CEPEDA CASTRO":       dict(size=16, color="#FFFFFF"),
+        "PALOMA VALENCIA LASERNA":  dict(size=11, color="#FFFFFF"),
+    }
     for trace in fig.data:
-        if trace.name == "ABELARDO DE LA ESPRIELLA":
+        if trace.name in _label_cands:
             trace.text = [f"{int(v):,}" for v in trace.customdata[:, 0]]
             trace.textposition = "inside"
-            trace.textfont = dict(size=16, color="#FFFFFF", family="IBM Plex Mono")
+            trace.textfont = dict(**_label_cands[trace.name], family="IBM Plex Mono")
             trace.insidetextanchor = "middle"
         else:
             trace.text = None
