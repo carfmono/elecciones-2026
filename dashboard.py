@@ -1809,6 +1809,135 @@ with t_proyeccion:
     Ajusta las tasas para ver cómo cambia el resultado.
     """)
 
+    # ── Encuestas 2ª vuelta ──────────────────────────────────────────────────
+    st.subheader("Encuestas publicadas – 2ª vuelta")
+
+    _POLLS = [
+        # (firma, fecha_pub, AE%, IC%, blanco_ns%, muestra, nota)
+        ("Invamer",          "abr-2026", 40.4, 40.6,  19.0,  None,  "Pre-1ª vuelta · escenario hipotético AE vs IC"),
+        ("CNC",              "may-2026", 43.6, 40.9,  15.5,  None,  "Pre-1ª vuelta · escenario hipotético"),
+        ("Guarumo / EcoAna", "may-2026", 43.6, 40.0,  16.4,  None,  "Pre-1ª vuelta · ninguno=16.4%"),
+        ("AtlasIntel",       "may-2026", 50.0, 41.3,   8.7,  None,  "Pre-1ª vuelta · escenario 2v"),
+        ("AtlasIntel",       "1-2 jun",  50.3, 42.6,   7.1,  2030,  "Post-1ª vuelta · blanco 3.7%, NS 2.9% · ±2% IC 95%"),
+    ]
+    _poll_df = pd.DataFrame(_POLLS, columns=["Firma", "Fecha", "AE%", "IC%", "Otros/NS%", "Muestra", "Nota"])
+
+    # Normalizar AE vs IC (excluyendo blancos/NS)
+    _poll_df["AE% norm"] = (_poll_df["AE%"] / (_poll_df["AE%"] + _poll_df["IC%"]) * 100).round(1)
+    _poll_df["IC% norm"] = 100 - _poll_df["AE% norm"]
+    _poll_df["Margen AE-IC"] = (_poll_df["AE%"] - _poll_df["IC%"]).round(1).apply(lambda v: f"{v:+.1f} pp")
+
+    # Promedio simple y ponderado de las encuestas post-1ª vuelta
+    _post = _poll_df[_poll_df["Fecha"].str.contains("jun")]
+    _prom_ae_norm = _poll_df["AE% norm"].mean()
+    _prom_ic_norm = _poll_df["IC% norm"].mean()
+
+    # Tabla resumen
+    _display = _poll_df[["Firma","Fecha","AE%","IC%","Otros/NS%","Margen AE-IC","Nota"]].copy()
+    _display.loc[len(_display)] = ["**PROMEDIO ENCUESTAS**", "—",
+                                    round(_poll_df["AE%"].mean(),1),
+                                    round(_poll_df["IC%"].mean(),1),
+                                    round(_poll_df["Otros/NS%"].mean(),1),
+                                    f"{round(_poll_df['AE%'].mean()-_poll_df['IC%'].mean(),1):+.1f} pp",
+                                    "Promedio simple de todas las encuestas"]
+    st.dataframe(_display, use_container_width=True, hide_index=True)
+
+    # Gráfico de encuestas
+    _fig_polls = go.Figure()
+    _firms = _poll_df["Firma"].tolist()
+    _labels = [f"{r['Firma']}<br>{r['Fecha']}" for _, r in _poll_df.iterrows()]
+
+    _fig_polls.add_trace(go.Bar(
+        name="AE (bruto)", x=_labels, y=_poll_df["AE%"],
+        marker_color="#1f77b4", text=_poll_df["AE%"].apply(lambda v: f"{v:.1f}%"),
+        textposition="outside",
+    ))
+    _fig_polls.add_trace(go.Bar(
+        name="IC (bruto)", x=_labels, y=_poll_df["IC%"],
+        marker_color="#CC0000", text=_poll_df["IC%"].apply(lambda v: f"{v:.1f}%"),
+        textposition="outside",
+    ))
+    _fig_polls.add_hline(y=50, line_dash="dot", line_color="#C8A96E",
+                         annotation_text="50% mayoría", annotation_position="right")
+    _fig_polls.update_layout(
+        barmode="group", height=400,
+        title="Intención de voto 2ª vuelta por encuestadora (% bruto)",
+        xaxis_title="", yaxis_title="% intención de voto",
+        yaxis_range=[30, 60],
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        margin=dict(t=60, b=20),
+    )
+    st.plotly_chart(_fig_polls, use_container_width=True)
+
+    # Gráfico de evolución del margen
+    _fig_margen = go.Figure()
+    _margenes = (_poll_df["AE%"] - _poll_df["IC%"]).tolist()
+    _fig_margen.add_trace(go.Scatter(
+        x=_labels, y=_margenes,
+        mode="lines+markers+text",
+        text=[f"{v:+.1f}" for v in _margenes],
+        textposition="top center",
+        marker_color=["#1f77b4" if v > 0 else "#CC0000" for v in _margenes],
+        marker_size=10,
+        line_color="#C8A96E",
+        name="Margen AE − IC",
+    ))
+    _fig_margen.add_hline(y=0, line_dash="dash", line_color="#666666",
+                          annotation_text="Empate", annotation_position="right")
+    _fig_margen.update_layout(
+        height=300, title="Evolución del margen AE − IC por encuesta (pp)",
+        yaxis_title="pp (positivo = AE lidera)", showlegend=False,
+        margin=dict(t=50, b=20),
+    )
+    st.plotly_chart(_fig_margen, use_container_width=True)
+
+    # Proyección de votos basada en encuestas
+    st.subheader("Votos implícitos según encuestas")
+    st.caption(
+        "Asumiendo participación similar a 1ª vuelta (~23.7M votos válidos interior). "
+        "Se normaliza AE vs IC excluyendo blancos/NS."
+    )
+    _votos_validos_1v = 23_685_329
+    _proj_rows = []
+    for _, r in _poll_df.iterrows():
+        ae_n = r["AE%"] / (r["AE%"] + r["IC%"])
+        ic_n = 1 - ae_n
+        _proj_rows.append({
+            "Firma":        r["Firma"],
+            "Fecha":        r["Fecha"],
+            "AE% (norm)":   f"{ae_n*100:.1f}%",
+            "IC% (norm)":   f"{ic_n*100:.1f}%",
+            "Votos AE":     f"{int(_votos_validos_1v * ae_n):,}",
+            "Votos IC":     f"{int(_votos_validos_1v * ic_n):,}",
+            "Margen votos": f"{int(_votos_validos_1v * (ae_n - ic_n)):+,}",
+        })
+    _prom_ae_n = _prom_ae_norm / 100
+    _prom_ic_n = _prom_ic_norm / 100
+    _proj_rows.append({
+        "Firma":        "**PROMEDIO**",
+        "Fecha":        "—",
+        "AE% (norm)":   f"{_prom_ae_norm:.1f}%",
+        "IC% (norm)":   f"{_prom_ic_norm:.1f}%",
+        "Votos AE":     f"{int(_votos_validos_1v * _prom_ae_n):,}",
+        "Votos IC":     f"{int(_votos_validos_1v * _prom_ic_n):,}",
+        "Margen votos": f"{int(_votos_validos_1v * (_prom_ae_n - _prom_ic_n)):+,}",
+    })
+    st.dataframe(pd.DataFrame(_proj_rows), use_container_width=True, hide_index=True)
+
+    # Mercados de predicción
+    st.subheader("Mercados de predicción (apuestas en tiempo real)")
+    _pred_df = pd.DataFrame([
+        ("Polymarket", "1 jun 2026", "AE 88%", "IC 13%", "Mercado de predicción descentralizado"),
+        ("Kalshi",     "may 2026",   "AE 43%", "IC 41%", "Pre-1ª vuelta"),
+    ], columns=["Plataforma", "Fecha", "AE prob.", "IC prob.", "Nota"])
+    st.dataframe(_pred_df, use_container_width=True, hide_index=True)
+    st.caption(
+        "Polymarket post-1ª vuelta: AE 88% de ganar la segunda vuelta (21 jun). "
+        "Los mercados de predicción agregan información de miles de apostadores con dinero real."
+    )
+
+    st.divider()
+
     v1 = {
         "PALOMA VALENCIA LASERNA":   1_637_665,
         "SERGIO FAJARDO VALDERRAMA": 1_007_943,
