@@ -141,7 +141,7 @@ hr {
     backdrop-filter: none !important;
     text-align: center;
     padding: 6px 16px;
-    font-size: 1.05rem;
+    font-size: 1.35rem;
     font-weight: 400;
     font-family: Georgia, serif;
     color: #C8A96E;
