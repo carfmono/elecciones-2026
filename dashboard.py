@@ -2454,6 +2454,5 @@ with t_antioquia:
 st.divider()
 st.caption(
     "Fuente: Registraduría Nacional del Estado Civil – Preconteo 31 mayo 2026 · "
-    "Datos actualizados al 99.92% de mesas informadas · "
-    "Código: github.com/carfmono/elecciones-2026"
+    "Datos actualizados al 99.92% de mesas informadas"
 )
