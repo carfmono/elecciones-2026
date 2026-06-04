@@ -620,6 +620,24 @@ _med_p_all, _med_m_all, _MED_COM_NAMES, _med_comunas_geo = load_medellin_data()
 
 
 @st.cache_data
+def _build_age_segments_cached(mesas_df):
+    _df = mesas_df[mesas_df["total_validos"] > 0].copy()
+    _df = _df.sort_values(["puesto", "mesa"])
+    _n    = _df.groupby("puesto")["mesa"].transform("count")
+    _rank = _df.groupby("puesto")["mesa"].rank(method="first")
+    _rel  = (_rank - 1) / (_n - 1).clip(lower=1)
+    _df["segmento"] = pd.cut(
+        _rel,
+        bins=[-0.001, 0.25, 0.5, 0.75, 1.001],
+        labels=["60+ años", "40–59 años", "25–39 años", "18–24 años"],
+    ).astype(str)
+    return _df
+
+
+_med_m_seg_global = _build_age_segments_cached(_med_m_all)
+
+
+@st.cache_data
 def load_amva_data():
     _p = pd.read_csv("resultados/amva_puestos.csv")
     _m = pd.read_csv("resultados/amva_mesas.csv")
@@ -3752,22 +3770,7 @@ with t_medellin:
         "para aproximar cuatro grupos etarios."
     )
 
-    # Calcular segmento de edad para cada mesa (por posición relativa dentro del puesto)
-    @st.cache_data
-    def _build_age_segments(mesas_df):
-        _df = mesas_df[mesas_df["total_validos"] > 0].copy()
-        _df = _df.sort_values(["puesto", "mesa"])
-        _n    = _df.groupby("puesto")["mesa"].transform("count")
-        _rank = _df.groupby("puesto")["mesa"].rank(method="first")
-        _rel  = (_rank - 1) / (_n - 1).clip(lower=1)
-        _df["segmento"] = pd.cut(
-            _rel,
-            bins=[-0.001, 0.25, 0.5, 0.75, 1.001],
-            labels=["60+ años", "40–59 años", "25–39 años", "18–24 años"],
-        ).astype(str)
-        return _df
-
-    _med_m_seg = _build_age_segments(_med_m_all)
+    _med_m_seg = _med_m_seg_global
 
     _SEG_ORDER  = ["60+ años", "40–59 años", "25–39 años", "18–24 años"]
     _SEG_COLORS = {
@@ -3933,6 +3936,98 @@ with t_medellin:
 
     st.divider()
 
+    # ── Mapa coroplético por comunas ──────────────────────────────────────────
+    st.markdown("##### Mapa de resultados por comuna – Medellín")
+
+    # Agregar candidatos por comunas (para hover completo)
+    _com_map_agg = (
+        _med_p_all.groupby("cod_comune")
+        .agg(
+            v_ae     =("v_abelardo_de_la_espriella", "sum"),
+            v_ic     =("v_ivan_cepeda",              "sum"),
+            v_paloma =("v_paloma_valencia",          "sum"),
+            v_fajardo=("v_sergio_fajardo",           "sum"),
+            validos  =("total_validos",              "sum"),
+            puestos  =("puesto",                     "count"),
+        ).reset_index()
+    )
+    _com_map_agg["pct_ae"]     = (_com_map_agg["v_ae"]      / _com_map_agg["validos"] * 100).round(1)
+    _com_map_agg["pct_ic"]     = (_com_map_agg["v_ic"]      / _com_map_agg["validos"] * 100).round(1)
+    _com_map_agg["pct_paloma"] = (_com_map_agg["v_paloma"]  / _com_map_agg["validos"] * 100).round(1)
+    _com_map_agg["pct_fajardo"]= (_com_map_agg["v_fajardo"] / _com_map_agg["validos"] * 100).round(1)
+    _com_map_agg["codigo"] = _com_map_agg["cod_comune"].apply(lambda v: str(int(v)).zfill(2))
+
+    # Construir lookups
+    _cma_lookup = _com_map_agg.set_index("codigo")
+
+    # Preparar listas para choropleth
+    _geo_codes  = [f["properties"]["codigo"] for f in _med_comunas_geo["features"]]
+    _geo_names  = [f["properties"].get("identificacion", f["properties"]["nombre"])
+                   for f in _med_comunas_geo["features"]]
+    _geo_pct_ae = []
+    _geo_hover  = []
+    for _code, _name in zip(_geo_codes, _geo_names):
+        if _code in _cma_lookup.index:
+            _r = _cma_lookup.loc[_code]
+            _geo_pct_ae.append(_r["pct_ae"])
+            _geo_hover.append(
+                f"<b>{_name}</b><br>"
+                f"Abelardo: <b>{_r['pct_ae']:.1f}%</b> · {int(_r['v_ae']):,}<br>"
+                f"Cepeda: {_r['pct_ic']:.1f}% · {int(_r['v_ic']):,}<br>"
+                f"Paloma: {_r['pct_paloma']:.1f}% · {int(_r['v_paloma']):,}<br>"
+                f"Fajardo: {_r['pct_fajardo']:.1f}% · {int(_r['v_fajardo']):,}<br>"
+                f"Válidos: {int(_r['validos']):,} · Puestos: {int(_r['puestos'])}"
+            )
+        else:
+            _geo_pct_ae.append(None)
+            _geo_hover.append(_name)
+
+    _fig_coro = go.Figure(go.Choroplethmapbox(
+        geojson=_med_comunas_geo,
+        locations=_geo_codes,
+        z=_geo_pct_ae,
+        featureidkey="properties.codigo",
+        colorscale=[[0,"#a8d4f5"],[0.4,"#4A90C0"],[0.7,"#1a5fa8"],[1,"#003880"]],
+        zmin=40, zmax=75,
+        colorbar=dict(
+            title="% AE", x=1.0, thickness=14, len=0.6,
+            tickfont=dict(color="#333", size=11),
+            title_font=dict(color="#333"),
+            ticksuffix="%",
+        ),
+        text=_geo_hover,
+        hovertemplate="%{text}<extra></extra>",
+        marker=dict(line=dict(color="#FFFFFF", width=1.2), opacity=0.88),
+        name="Comunas",
+    ))
+
+    # Añadir centroides de puestos para contexto
+    _fp_map = _med_p_all.dropna(subset=["lat","lon"]).copy()
+    _fp_max = _fp_map["total_validos"].max() or 1
+    _fp_map["ms"] = (_fp_map["total_validos"] / _fp_max * 8 + 3).clip(3, 12)
+    _fig_coro.add_trace(go.Scattermapbox(
+        lat=_fp_map["lat"], lon=_fp_map["lon"],
+        mode="markers", name="Puestos",
+        marker=dict(size=_fp_map["ms"], color="rgba(255,255,255,0.35)"),
+        hovertemplate="<b>%{text}</b><extra></extra>",
+        text=_fp_map["puesto"],
+    ))
+
+    _fig_coro.update_layout(
+        mapbox=dict(style="carto-positron", zoom=10.5,
+                    center={"lat": 6.247, "lon": -75.565}),
+        height=600,
+        margin=dict(l=0, r=0, t=0, b=0),
+        paper_bgcolor="rgba(0,0,0,0)",
+        legend=dict(orientation="h", yanchor="bottom", y=0.02, xanchor="left", x=0.02,
+                    bgcolor="rgba(255,255,255,0.85)", bordercolor="#ccc", borderwidth=1,
+                    font=dict(color="#333", size=11)),
+    )
+    st.plotly_chart(_fig_coro, use_container_width=True,
+                    config={"scrollZoom": True, "displayModeBar": False})
+
+    st.divider()
+
     # ── Por comuna: AE% por grupo etario ─────────────────────────────────────
     st.markdown("##### AE% por grupo etario en cada comuna")
 
@@ -3985,6 +4080,35 @@ with t_medellin:
     st.divider()
     st.markdown("##### Tabla completa por comuna")
 
+    # ── Cifras oficiales ciudad (del dataset principal de municipios) ──────────
+    _med_row = df[df["muni_nombre"].str.contains("MEDELL", na=False)].iloc[0]
+    _m_sufragantes = int(_med_row["total_votantes"])       # personas que votaron
+    _m_abstencion  = int(_med_row["total_abstencion"])     # personas que no votaron
+    _m_inscritos   = _m_sufragantes + _m_abstencion        # censo electoral
+    _m_validos     = int(_med_row["votos_validos"])
+    _m_nulos       = int(_med_row["votos_nulos"])
+    _m_blancos     = int(_med_row["votos_blancos"])
+    _m_pct_part    = float(_med_row["pct_participacion"])
+    _m_total_mesas = int(_med_row["mesas_total"])
+    # Factor de ajuste: válidos → sufragantes
+    _m_validos_puestos = int(_med_p_all["total_validos"].sum())
+    _m_ajuste = _m_sufragantes / _m_validos_puestos if _m_validos_puestos else 1
+
+    # Métricas ciudad
+    _mc1,_mc2,_mc3,_mc4,_mc5,_mc6 = st.columns(6)
+    _mc1.metric("Inscritos",     f"{_m_inscritos:,}")
+    _mc2.metric("Sufragantes",   f"{_m_sufragantes:,}",
+                f"{_m_pct_part:.1f}% participación", delta_color="off")
+    _mc3.metric("Abstención",    f"{_m_abstencion:,}",
+                f"{_m_abstencion/_m_inscritos*100:.1f}%", delta_color="inverse")
+    _mc4.metric("Votos válidos", f"{_m_validos:,}")
+    _mc5.metric("Votos nulos",   f"{_m_nulos:,}",
+                f"{_m_nulos/_m_sufragantes*100:.1f}% de sufragantes", delta_color="off")
+    _mc6.metric("Votos blancos", f"{_m_blancos:,}",
+                f"{_m_blancos/_m_sufragantes*100:.1f}% de sufragantes", delta_color="off")
+
+    st.divider()
+
     # ── Tabla 1: resumen general por comuna ───────────────────────────────────
     _com_resumen = (
         _med_p_all.groupby("comuna_label")
@@ -3998,44 +4122,56 @@ with t_medellin:
             v_fajardo=("v_sergio_fajardo",           "sum"),
         ).reset_index()
     )
-    _com_resumen["pct_ae"]     = (_com_resumen["v_ae"]      / _com_resumen["validos"] * 100).round(1)
-    _com_resumen["pct_ic"]     = (_com_resumen["v_ic"]      / _com_resumen["validos"] * 100).round(1)
-    _com_resumen["pct_paloma"] = (_com_resumen["v_paloma"]  / _com_resumen["validos"] * 100).round(1)
-    _com_resumen["pct_fajardo"]= (_com_resumen["v_fajardo"] / _com_resumen["validos"] * 100).round(1)
+    # Estimación: inscritos proporcional a mesas; participación vía factor de ajuste
+    _com_resumen["est_inscritos"]   = (_com_resumen["mesas"] / _m_total_mesas * _m_inscritos).round(0).astype(int)
+    _com_resumen["est_sufragantes"] = (_com_resumen["validos"] * _m_ajuste).round(0).astype(int)
+    _com_resumen["est_pct_part"]    = (_com_resumen["est_sufragantes"] / _com_resumen["est_inscritos"] * 100).round(1)
+    _com_resumen["pct_ae"]      = (_com_resumen["v_ae"]      / _com_resumen["validos"] * 100).round(1)
+    _com_resumen["pct_ic"]      = (_com_resumen["v_ic"]      / _com_resumen["validos"] * 100).round(1)
+    _com_resumen["pct_paloma"]  = (_com_resumen["v_paloma"]  / _com_resumen["validos"] * 100).round(1)
+    _com_resumen["pct_fajardo"] = (_com_resumen["v_fajardo"] / _com_resumen["validos"] * 100).round(1)
     _com_resumen = _com_resumen.sort_values("pct_ae", ascending=False)
 
     # Fila Total Medellín
     _total_row = pd.DataFrame([{
-        "comuna_label": "TOTAL MEDELLÍN",
-        "puestos":   _com_resumen["puestos"].sum(),
-        "mesas":     _com_resumen["mesas"].sum(),
-        "validos":   _com_resumen["validos"].sum(),
-        "v_ae":      _com_resumen["v_ae"].sum(),
-        "v_ic":      _com_resumen["v_ic"].sum(),
-        "v_paloma":  _com_resumen["v_paloma"].sum(),
-        "v_fajardo": _com_resumen["v_fajardo"].sum(),
-        "pct_ae":    round(_com_resumen["v_ae"].sum()      / _com_resumen["validos"].sum() * 100, 1),
-        "pct_ic":    round(_com_resumen["v_ic"].sum()      / _com_resumen["validos"].sum() * 100, 1),
-        "pct_paloma":round(_com_resumen["v_paloma"].sum()  / _com_resumen["validos"].sum() * 100, 1),
-        "pct_fajardo":round(_com_resumen["v_fajardo"].sum()/ _com_resumen["validos"].sum() * 100, 1),
+        "comuna_label":    "TOTAL MEDELLÍN",
+        "puestos":         _com_resumen["puestos"].sum(),
+        "mesas":           _m_total_mesas,
+        "validos":         _m_validos_puestos,
+        "est_inscritos":   _m_inscritos,
+        "est_sufragantes": _m_sufragantes,
+        "est_pct_part":    _m_pct_part,
+        "v_ae":            _com_resumen["v_ae"].sum(),
+        "v_ic":            _com_resumen["v_ic"].sum(),
+        "v_paloma":        _com_resumen["v_paloma"].sum(),
+        "v_fajardo":       _com_resumen["v_fajardo"].sum(),
+        "pct_ae":          round(_com_resumen["v_ae"].sum()     / _m_validos_puestos * 100, 1),
+        "pct_ic":          round(_com_resumen["v_ic"].sum()     / _m_validos_puestos * 100, 1),
+        "pct_paloma":      round(_com_resumen["v_paloma"].sum() / _m_validos_puestos * 100, 1),
+        "pct_fajardo":     round(_com_resumen["v_fajardo"].sum()/ _m_validos_puestos * 100, 1),
     }])
     _com_resumen = pd.concat([_com_resumen, _total_row], ignore_index=True)
 
     _tbl1 = _com_resumen[[
-        "comuna_label","puestos","mesas","validos",
-        "v_ae","pct_ae","v_ic","pct_ic","v_paloma","pct_paloma","v_fajardo","pct_fajardo",
+        "comuna_label","puestos","mesas","est_inscritos","est_sufragantes","est_pct_part",
+        "validos","v_ae","pct_ae","v_ic","pct_ic","v_paloma","pct_paloma","v_fajardo","pct_fajardo",
     ]].rename(columns={
-        "comuna_label":"Comuna","puestos":"Puestos","mesas":"Mesas","validos":"Válidos",
+        "comuna_label":"Comuna","puestos":"Puestos","mesas":"Mesas",
+        "est_inscritos":"Inscritos*","est_sufragantes":"Sufragantes*","est_pct_part":"% Part.*",
+        "validos":"Válidos",
         "v_ae":"Votos AE","pct_ae":"% AE","v_ic":"Votos IC","pct_ic":"% IC",
         "v_paloma":"Votos Paloma","pct_paloma":"% Paloma","v_fajardo":"Votos Fajardo","pct_fajardo":"% Fajardo",
     }).reset_index(drop=True)
-    for _c in ["Válidos","Votos AE","Votos IC","Votos Paloma","Votos Fajardo"]:
+    for _c in ["Inscritos*","Sufragantes*","Válidos","Votos AE","Votos IC","Votos Paloma","Votos Fajardo"]:
         _tbl1[_c] = _tbl1[_c].apply(lambda v: f"{int(v):,}")
-    for _c in ["% AE","% IC","% Paloma","% Fajardo"]:
+    for _c in ["% Part.*","% AE","% IC","% Paloma","% Fajardo"]:
         _tbl1[_c] = _tbl1[_c].apply(lambda v: f"{v:.1f}%")
     _tbl1["Mesas"] = _tbl1["Mesas"].apply(lambda v: f"{int(v):,}")
 
-    st.caption("Votos válidos. Fuente: Registraduría – preconteo 31 mayo 2026. No incluye votos en blanco ni nulos.")
+    st.caption(
+        "* Inscritos, Sufragantes y % Part. son estimados proporcionales al número de mesas por comuna "
+        "(la fila TOTAL usa cifras oficiales de la Registraduría). Votos válidos excluyen nulos y blancos."
+    )
     st.dataframe(_tbl1, use_container_width=True, hide_index=True)
 
     st.divider()
