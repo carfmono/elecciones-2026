@@ -619,6 +619,20 @@ def load_medellin_data():
 _med_p_all, _med_m_all, _MED_COM_NAMES, _med_comunas_geo = load_medellin_data()
 
 
+@st.cache_data
+def load_amva_data():
+    _p = pd.read_csv("resultados/amva_puestos.csv")
+    _m = pd.read_csv("resultados/amva_mesas.csv")
+    _p["cod_comune"] = _p["cod_comune"].fillna(0).astype(int)
+    _m["cod_comuna"] = _m["cod_comuna"].fillna(0).astype(int)
+    _MUNIS_ORDER = ["MEDELLÍN","BELLO","ITAGÜÍ","ENVIGADO","SABANETA",
+                    "LA ESTRELLA","CALDAS","COPACABANA","GIRARDOTA","BARBOSA"]
+    return _p, _m, _MUNIS_ORDER
+
+
+_amva_p_all, _amva_m_all, _AMVA_MUNIS = load_amva_data()
+
+
 # ── Tema oscuro editorial (fijo) ──────────────────────────────────────────────
 _PLOTLY_TPL = "plotly_dark"
 _GEO_LAND   = "rgba(40,40,40,0.7)"
@@ -730,7 +744,7 @@ def _reset_proyeccion() -> None:
 
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
-t_nacional, t_depts, t_antioquia, t_fuerza_ae, t_fuerza_paloma, t_coalicion, t_proyeccion, t_medellin = st.tabs([
+t_nacional, t_depts, t_antioquia, t_fuerza_ae, t_fuerza_paloma, t_coalicion, t_proyeccion, t_medellin, t_amva = st.tabs([
     "Resultados Nacionales",
     "Por Departamento",
     "Solo Antioquia",
@@ -739,6 +753,7 @@ t_nacional, t_depts, t_antioquia, t_fuerza_ae, t_fuerza_paloma, t_coalicion, t_p
     "Análisis Coalición",
     "Proyección 2ª Vuelta",
     "Medellín",
+    "Área Metropolitana",
 ])
 
 
@@ -3203,6 +3218,561 @@ with t_medellin:
             _tbl_faj[_c] = _tbl_faj[_c].apply(lambda v: f"{v:.1f}%")
         _tbl_faj["Válidos"] = _tbl_faj["Válidos"].apply(lambda v: f"{int(v):,}")
         st.dataframe(_tbl_faj, use_container_width=True, hide_index=True)
+
+
+# ── Tab Área Metropolitana ────────────────────────────────────────────────────
+with t_amva:
+    st.header("Área Metropolitana del Valle de Aburrá")
+
+    _AV_CANDS_4 = {
+        "v_abelardo_de_la_espriella": ("Abelardo", "#1f77b4"),
+        "v_ivan_cepeda":              ("Cepeda",   "#CC0000"),
+        "v_paloma_valencia":          ("Paloma",   "#2ca02c"),
+        "v_sergio_fajardo":           ("Fajardo",  "#ff7f0e"),
+    }
+
+    # ── Procesar click de mapa (run anterior) ─────────────────────────────────
+    if "_amva_map_click" in st.session_state:
+        _av_clicked = st.session_state.pop("_amva_map_click")
+        _av_cbuf = _amva_p_all[_amva_p_all["puesto"] == _av_clicked]
+        if not _av_cbuf.empty:
+            st.session_state["av_drill_muni"]   = _av_cbuf.iloc[0]["municipio"]
+            st.session_state["av_drill_puesto"] = _av_clicked
+
+    # ── Filtros ───────────────────────────────────────────────────────────────
+    _av_f1, _av_f2, _av_f3, _av_f4 = st.columns([1, 1, 2, 0.6])
+
+    _av_muni_opts = ["Todos los municipios"] + sorted(_amva_p_all["municipio"].unique().tolist())
+    with _av_f1:
+        _av_sel_muni = st.selectbox("Mapa — municipio", _av_muni_opts, key="av_mapa_muni")
+
+    _av_drill_muni_opts = ["— Todos —"] + sorted(_amva_p_all["municipio"].unique().tolist())
+    with _av_f2:
+        _av_d_muni = st.selectbox("Drill-down — municipio", _av_drill_muni_opts, key="av_drill_muni")
+
+    if st.session_state.get("_av_last_muni") != _av_d_muni:
+        st.session_state["_av_last_muni"]    = _av_d_muni
+        st.session_state["av_drill_puesto"]  = "— Sin seleccionar —"
+
+    if _av_d_muni == "— Todos —":
+        _av_d_p_df   = _amva_p_all.copy()
+        _av_d_m_pool = _amva_m_all.copy()
+    else:
+        _av_d_p_df   = _amva_p_all[_amva_p_all["municipio"] == _av_d_muni].copy()
+        _av_d_m_pool = _amva_m_all[_amva_m_all["municipio"] == _av_d_muni].copy()
+
+    _av_puesto_opts = ["— Sin seleccionar —"] + sorted(_av_d_p_df["puesto"].unique().tolist())
+    with _av_f3:
+        _av_d_puesto = st.selectbox("Drill-down — puesto", _av_puesto_opts, key="av_drill_puesto")
+    with _av_f4:
+        st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
+        if st.button("Limpiar filtros", key="av_clear"):
+            for _k in ["av_mapa_muni","av_drill_muni","av_drill_puesto","_av_last_muni"]:
+                if _k in st.session_state: del st.session_state[_k]
+            st.rerun()
+
+    # Datos para mapa
+    if _av_sel_muni == "Todos los municipios":
+        _av_fp = _amva_p_all.copy()
+        _av_fm = _amva_m_all.copy()
+    else:
+        _av_fp = _amva_p_all[_amva_p_all["municipio"] == _av_sel_muni].copy()
+        _av_fm = _amva_m_all[_amva_m_all["municipio"] == _av_sel_muni].copy()
+
+    # ── Métricas ──────────────────────────────────────────────────────────────
+    _av_ae   = int(_av_fp["votos_abelardo"].sum())
+    _av_val  = int(_av_fp["total_validos"].sum())
+    _av_pct  = _av_ae / _av_val * 100 if _av_val else 0
+    _av_nm   = int(_av_fp["n_mesas"].sum())
+    _av_np   = len(_av_fp)
+    _av_vrd  = (_av_fp["semaforo"] == "verde").sum()
+    _av_amar = (_av_fp["semaforo"] != "verde").sum()
+
+    _avc1,_avc2,_avc3,_avc4,_avc5 = st.columns(5)
+    _avc1.metric("Votos Abelardo",  f"{_av_ae:,}")
+    _avc2.metric("Votos válidos",   f"{_av_val:,}")
+    _avc3.metric("% Abelardo",      f"{_av_pct:.1f}%")
+    _avc4.metric("Puestos",         f"{_av_np}",
+                 f"{_av_vrd} 1° · {_av_amar} 2°+", delta_color="off")
+    _avc5.metric("Mesas",           f"{_av_nm:,}")
+
+    st.divider()
+
+    # ── Mapa + barra ──────────────────────────────────────────────────────────
+    _av_cm, _av_cb = st.columns([3, 2], gap="large")
+
+    with _av_cm:
+        st.subheader("Mapa AMVA")
+
+        _av_map = _av_fp.dropna(subset=["lat","lon"]).copy()
+        _av_max = _av_map["total_validos"].max() or 1
+        _av_map["msize"] = (_av_map["total_validos"] / _av_max * 16 + 5).clip(5, 22)
+
+        _av_map_ae  = _av_map[_av_map["semaforo"] == "verde"].copy()
+        _av_map_ic  = _av_map[_av_map["semaforo"] != "verde"].copy()
+        _av_map_sel = (
+            _av_map[_av_map["puesto"] == _av_d_puesto].copy()
+            if _av_d_puesto != "— Sin seleccionar —" else pd.DataFrame()
+        )
+
+        def _av_htxt(r):
+            return (f"<b>{r['puesto']}</b><br>"
+                    f"Municipio: {r['municipio']}<br>"
+                    f"Abelardo: <b>{r['pct_abelardo']:.1f}%</b> · {int(r['votos_abelardo']):,}<br>"
+                    f"Válidos: {int(r['total_validos']):,}")
+
+        _av_map["_ht"] = _av_map.apply(_av_htxt, axis=1)
+
+        _fig_avm = go.Figure()
+
+        # Trace 0: polígonos de comunas Medellín
+        _fig_avm.add_trace(go.Choroplethmapbox(
+            geojson=_med_comunas_geo,
+            locations=[f["properties"]["codigo"] for f in _med_comunas_geo["features"]],
+            z=[0] * len(_med_comunas_geo["features"]),
+            featureidkey="properties.codigo",
+            colorscale=[[0,"rgba(180,180,180,0.12)"],[1,"rgba(180,180,180,0.12)"]],
+            showscale=False,
+            marker=dict(line=dict(color="#aaaaaa", width=0.8), opacity=0.4),
+            hoverinfo="skip", name="Comunas",
+        ))
+
+        if len(_av_map_ae):
+            _av_map_ae["_ht"] = _av_map_ae.apply(_av_htxt, axis=1)
+            _fig_avm.add_trace(go.Scattermapbox(
+                lat=_av_map_ae["lat"], lon=_av_map_ae["lon"],
+                mode="markers", name="Abelardo 1°",
+                customdata=_av_map_ae["puesto"].values,
+                marker=dict(
+                    size=_av_map_ae["msize"],
+                    color=_av_map_ae["pct_abelardo"],
+                    colorscale=[[0,"#a8d4f5"],[0.5,"#4A90C0"],[1,"#003880"]],
+                    cmin=40, cmax=82, showscale=True,
+                    colorbar=dict(title="% AE", x=1.0, thickness=12, len=0.5,
+                                  tickfont=dict(color="#444",size=10),
+                                  title_font=dict(color="#444"), ticksuffix="%"),
+                    opacity=0.88,
+                ),
+                text=_av_map_ae["_ht"], hoverinfo="text",
+            ))
+
+        if len(_av_map_ic):
+            _av_map_ic["_ht_ic"] = _av_map_ic.apply(
+                lambda r: (f"<b>{r['puesto']}</b><br>{r['municipio']}<br>"
+                           f"⚠ Abelardo 2° — {r['pct_abelardo']:.1f}%<br>"
+                           f"Válidos: {int(r['total_validos']):,}"), axis=1)
+            _fig_avm.add_trace(go.Scattermapbox(
+                lat=_av_map_ic["lat"], lon=_av_map_ic["lon"],
+                mode="markers", name="Cepeda 1°",
+                customdata=_av_map_ic["puesto"].values,
+                marker=dict(size=_av_map_ic["msize"], color="#CC0000", opacity=0.88),
+                text=_av_map_ic["_ht_ic"], hoverinfo="text",
+            ))
+
+        if len(_av_map_sel):
+            _avs = _av_map_sel.iloc[0]
+            _fig_avm.add_trace(go.Scattermapbox(
+                lat=[_avs["lat"]], lon=[_avs["lon"]],
+                mode="markers+text", name="Seleccionado",
+                customdata=[_avs["puesto"]],
+                marker=dict(size=26, color="#C8A96E", opacity=1.0),
+                text=[_av_d_puesto], textposition="top center",
+                textfont=dict(size=11, color="#C8A96E"),
+                hovertext=(f"<b>★ {_avs['puesto']}</b><br>{_avs['municipio']}<br>"
+                           f"Abelardo: {_avs['pct_abelardo']:.1f}%"),
+                hoverinfo="text",
+            ))
+            _avm_center = {"lat": _avs["lat"], "lon": _avs["lon"]}
+            _avm_zoom   = 14
+        else:
+            _avm_center = {"lat": 6.23, "lon": -75.59}
+            _avm_zoom   = 10
+
+        _fig_avm.update_layout(
+            mapbox=dict(style="carto-positron", zoom=_avm_zoom, center=_avm_center),
+            height=540,
+            margin=dict(l=0,r=0,t=0,b=0),
+            paper_bgcolor="rgba(0,0,0,0)",
+            legend=dict(orientation="h", yanchor="bottom", y=0.02, xanchor="left", x=0.02,
+                        bgcolor="rgba(255,255,255,0.85)", bordercolor="#ccc", borderwidth=1,
+                        font=dict(color="#333",size=11)),
+        )
+        _av_mev = st.plotly_chart(
+            _fig_avm, use_container_width=True,
+            on_select="rerun", selection_mode="points",
+            config={"scrollZoom": True, "displayModeBar": False},
+        )
+        if (_av_mev and hasattr(_av_mev,"selection")
+                and _av_mev.selection.points):
+            _av_pt = _av_mev.selection.points[0]
+            _av_cp = _av_pt.get("customdata")
+            if _av_cp and isinstance(_av_cp, str):
+                st.session_state["_amva_map_click"] = _av_cp
+                st.rerun()
+
+    with _av_cb:
+        st.subheader("Puestos por % Abelardo")
+        _av_bar = _av_fp.copy().sort_values("pct_abelardo", ascending=True)
+        _av_bar["color"] = _av_bar.apply(
+            lambda r: "#C8A96E" if r["puesto"] == _av_d_puesto
+                      else ("#CC0000" if r["semaforo"] != "verde" else "#1f77b4"), axis=1)
+        if len(_av_bar) > 50:
+            _av_bar = pd.concat([_av_bar.head(25), _av_bar.tail(25)])
+        _fig_avb = go.Figure(go.Bar(
+            y=_av_bar["puesto"], x=_av_bar["pct_abelardo"], orientation="h",
+            marker_color=_av_bar["color"],
+            text=_av_bar.apply(lambda r: f"{r['municipio'][:4]}· {r['pct_abelardo']:.1f}%", axis=1),
+            textposition="outside",
+            textfont=dict(size=9, color="#9A9A90", family="IBM Plex Mono"),
+            customdata=_av_bar[["votos_abelardo","total_validos","municipio"]].values,
+            hovertemplate=("<b>%{y}</b><br>%{customdata[2]}<br>"
+                           "AE: <b>%{x:.1f}%</b><br>"
+                           "Votos: %{customdata[0]:,} · Válidos: %{customdata[1]:,}<extra></extra>"),
+        ))
+        _fig_avb.update_layout(
+            height=540, margin=dict(l=0,r=80,t=10,b=10),
+            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#111111",
+            xaxis=dict(range=[0,100], ticksuffix="%", gridcolor="#1E1E1E",
+                       tickfont=dict(color="#9A9A90")),
+            yaxis=dict(gridcolor="rgba(0,0,0,0)", tickfont=dict(color="#9A9A90",size=8)),
+            showlegend=False,
+        )
+        st.plotly_chart(_fig_avb, use_container_width=True, config={"displayModeBar": False})
+
+    st.divider()
+
+    # ── Drill-down mesa a mesa ────────────────────────────────────────────────
+    st.subheader("Análisis mesa a mesa")
+
+    if _av_d_puesto == "— Sin seleccionar —":
+        st.info("Selecciona un puesto en el selector o haz clic en el mapa.")
+    else:
+        _av_dm = _av_d_m_pool[_av_d_m_pool["puesto"] == _av_d_puesto].sort_values("mesa").copy()
+        _av_dmv = _av_dm[_av_dm["total_validos"] > 0].copy()
+
+        if _av_dmv.empty:
+            st.info("No hay mesas con datos para este puesto.")
+        else:
+            _av_ae_p  = int(_av_dmv["v_abelardo_de_la_espriella"].sum())
+            _av_ic_p  = int(_av_dmv["v_ivan_cepeda"].sum())
+            _av_pal_p = int(_av_dmv["v_paloma_valencia"].sum())
+            _av_faj_p = int(_av_dmv["v_sergio_fajardo"].sum())
+            _av_val_p = int(_av_dmv["total_validos"].sum())
+            _av_nm_p  = len(_av_dmv)
+
+            _amd1,_amd2,_amd3,_amd4,_amd5,_amd6 = st.columns(6)
+            _amd1.metric("Abelardo", f"{_av_ae_p:,}",
+                         f"{_av_ae_p/_av_val_p*100:.1f}%", delta_color="off")
+            _amd2.metric("Cepeda",   f"{_av_ic_p:,}",
+                         f"{_av_ic_p/_av_val_p*100:.1f}%", delta_color="off")
+            _amd3.metric("Paloma",   f"{_av_pal_p:,}",
+                         f"{_av_pal_p/_av_val_p*100:.1f}%", delta_color="off")
+            _amd4.metric("Fajardo",  f"{_av_faj_p:,}",
+                         f"{_av_faj_p/_av_val_p*100:.1f}%", delta_color="off")
+            _amd5.metric("Válidos",  f"{_av_val_p:,}")
+            _amd6.metric("Mesas",    str(_av_nm_p))
+
+            _av_mlabels = [f"Mesa {int(r)}" for r in _av_dmv["mesa"]]
+
+            # Barras apiladas %
+            _fig_avs = go.Figure()
+            for _col,(_lbl,_clr) in _AV_CANDS_4.items():
+                _vals = _av_dmv[_col].values
+                _pcts = (_vals / _av_dmv["total_validos"].values * 100).round(1)
+                _fig_avs.add_trace(go.Bar(
+                    name=_lbl, x=_av_mlabels, y=_pcts,
+                    marker_color=_clr,
+                    text=[f"{v:.0f}%" for v in _pcts],
+                    textposition="inside", insidetextanchor="middle",
+                    textfont=dict(size=9,color="#FFFFFF",family="IBM Plex Mono"),
+                    customdata=_vals,
+                    hovertemplate=(f"<b>{_lbl}</b><br>%{{y:.1f}}% · %{{customdata:,}}<extra></extra>"),
+                ))
+            _otros_v = (_av_dmv["total_validos"].values
+                        - sum(_av_dmv[c].values for c in _AV_CANDS_4))
+            _otros_p = (_otros_v / _av_dmv["total_validos"].values * 100).round(1)
+            _fig_avs.add_trace(go.Bar(
+                name="Otros", x=_av_mlabels, y=_otros_p,
+                marker_color="#555555", text=None,
+                hovertemplate="<b>Otros</b><br>%{y:.1f}%<extra></extra>",
+            ))
+            _fig_avs.update_layout(
+                barmode="stack", height=360,
+                margin=dict(l=0,r=0,t=10,b=0),
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#111111",
+                xaxis=dict(tickfont=dict(color="#9A9A90",size=10), gridcolor="rgba(0,0,0,0)"),
+                yaxis=dict(ticksuffix="%", range=[0,100], gridcolor="#1E1E1E",
+                           tickfont=dict(color="#9A9A90")),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0,
+                            font=dict(color="#9A9A90",size=11), bgcolor="rgba(0,0,0,0)"),
+            )
+            st.plotly_chart(_fig_avs, use_container_width=True, config={"displayModeBar": False})
+
+            # Líneas comparativas
+            _fig_avl = go.Figure()
+            for _col,(_lbl,_clr) in _AV_CANDS_4.items():
+                _pcts = (_av_dmv[_col].values / _av_dmv["total_validos"].values * 100).round(1)
+                _fig_avl.add_trace(go.Scatter(
+                    x=_av_mlabels, y=_pcts, mode="lines+markers", name=_lbl,
+                    line=dict(color=_clr,width=2.5), marker=dict(size=8,color=_clr),
+                    hovertemplate=f"<b>{_lbl}</b> · %{{y:.1f}}<extra></extra>",
+                ))
+            _av_avg_ae = (_av_dmv["v_abelardo_de_la_espriella"].sum()
+                          / _av_dmv["total_validos"].sum() * 100)
+            _fig_avl.add_hline(y=_av_avg_ae, line_dash="dot", line_color="#1f77b4",
+                               line_width=1,
+                               annotation_text=f"AE prom. {_av_avg_ae:.1f}%",
+                               annotation_font=dict(color="#1f77b4",size=10),
+                               annotation_position="right")
+            _fig_avl.update_layout(
+                height=300, margin=dict(l=0,r=80,t=10,b=0),
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#111111",
+                xaxis=dict(tickfont=dict(color="#9A9A90",size=10), gridcolor="#1E1E1E"),
+                yaxis=dict(ticksuffix="%", gridcolor="#1E1E1E", tickfont=dict(color="#9A9A90")),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0,
+                            font=dict(color="#9A9A90",size=11), bgcolor="rgba(0,0,0,0)"),
+            )
+            st.plotly_chart(_fig_avl, use_container_width=True, config={"displayModeBar": False})
+
+            st.divider()
+
+            # Top / Bottom mesas
+            _av_dmv["sem_icon"] = _av_dmv["semaforo"].map(
+                {"verde":"🟢 1°","amarillo":"🟡 2°","rojo":"🔴 3°+"}).fillna("⚪")
+            _av_rcols = ["mesa","votos_abelardo","v_ivan_cepeda",
+                         "v_paloma_valencia","v_sergio_fajardo",
+                         "total_validos","pct_abelardo","sem_icon"]
+            _av_rren  = {"mesa":"Mesa","votos_abelardo":"Abelardo","v_ivan_cepeda":"Cepeda",
+                         "v_paloma_valencia":"Paloma","v_sergio_fajardo":"Fajardo",
+                         "total_validos":"Válidos","pct_abelardo":"% AE","sem_icon":"Pos."}
+
+            def _av_fmt(df_in):
+                df_o = df_in[_av_rcols].rename(columns=_av_rren).reset_index(drop=True).copy()
+                df_o["% AE"] = df_o["% AE"].apply(lambda v: f"{v:.1f}%")
+                for _c in ["Abelardo","Cepeda","Paloma","Fajardo","Válidos"]:
+                    df_o[_c] = df_o[_c].apply(lambda v: f"{int(v):,}")
+                return df_o
+
+            _av_tl, _av_tr = st.columns(2)
+            with _av_tl:
+                st.markdown("##### Mayor % Abelardo")
+                st.dataframe(_av_fmt(_av_dmv.nlargest(10,"pct_abelardo")),
+                             use_container_width=True, hide_index=True)
+            with _av_tr:
+                st.markdown("##### Menor % Abelardo")
+                st.dataframe(_av_fmt(_av_dmv.nsmallest(10,"pct_abelardo")),
+                             use_container_width=True, hide_index=True)
+
+    st.divider()
+
+    # ── Resumen por municipio ─────────────────────────────────────────────────
+    st.subheader("Comparativo por municipio")
+
+    _av_muni_sum = (
+        _amva_p_all.groupby("municipio")
+        .agg(
+            puestos=("puesto","count"),
+            mesas=("n_mesas","sum"),
+            votos_ae=("votos_abelardo","sum"),
+            total_val=("total_validos","sum"),
+            v_ic=("v_ivan_cepeda","sum"),
+            v_paloma=("v_paloma_valencia","sum"),
+            v_fajardo=("v_sergio_fajardo","sum"),
+        ).reset_index()
+    )
+    _av_muni_sum["pct_ae"]     = (_av_muni_sum["votos_ae"]  / _av_muni_sum["total_val"] * 100).round(1)
+    _av_muni_sum["pct_ic"]     = (_av_muni_sum["v_ic"]      / _av_muni_sum["total_val"] * 100).round(1)
+    _av_muni_sum["pct_paloma"] = (_av_muni_sum["v_paloma"]  / _av_muni_sum["total_val"] * 100).round(1)
+    _av_muni_sum["pct_fajardo"]= (_av_muni_sum["v_fajardo"] / _av_muni_sum["total_val"] * 100).round(1)
+    _av_muni_sum["pot_ambos"]  = (
+        (_av_muni_sum["votos_ae"] + _av_muni_sum["v_paloma"] + _av_muni_sum["v_fajardo"])
+        / _av_muni_sum["total_val"] * 100
+    ).round(1)
+    _av_muni_sum = _av_muni_sum.sort_values("pct_ae", ascending=False)
+
+    # Gráfico barras agrupadas por municipio
+    _fig_avmuni = go.Figure()
+    for _col, _lbl, _clr in [
+        ("pct_ae","Abelardo","#1f77b4"),
+        ("pct_ic","Cepeda","#CC0000"),
+        ("pct_paloma","Paloma","#2ca02c"),
+        ("pct_fajardo","Fajardo","#ff7f0e"),
+    ]:
+        _fig_avmuni.add_trace(go.Bar(
+            name=_lbl,
+            x=_av_muni_sum["municipio"],
+            y=_av_muni_sum[_col],
+            marker_color=_clr,
+            text=_av_muni_sum[_col].apply(lambda v: f"{v:.1f}%"),
+            textposition="outside",
+            textfont=dict(size=10, family="IBM Plex Mono", color="#9A9A90"),
+            hovertemplate=f"<b>%{{x}}</b><br>{_lbl}: %{{y:.1f}}%<extra></extra>",
+        ))
+    _fig_avmuni.update_layout(
+        barmode="group", height=380,
+        margin=dict(l=0,r=0,t=10,b=0),
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#111111",
+        xaxis=dict(tickfont=dict(color="#9A9A90"), gridcolor="rgba(0,0,0,0)"),
+        yaxis=dict(ticksuffix="%", range=[0,80], gridcolor="#1E1E1E",
+                   tickfont=dict(color="#9A9A90")),
+        legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="left", x=0,
+                    font=dict(color="#9A9A90",size=11), bgcolor="rgba(0,0,0,0)"),
+    )
+    st.plotly_chart(_fig_avmuni, use_container_width=True, config={"displayModeBar": False})
+
+    # Tabla resumen
+    _av_tbl = _av_muni_sum[["municipio","puestos","mesas","total_val",
+                              "pct_ae","pct_ic","pct_paloma","pct_fajardo","pot_ambos"]].rename(columns={
+        "municipio":"Municipio","puestos":"Puestos","mesas":"Mesas",
+        "total_val":"Válidos","pct_ae":"% AE","pct_ic":"% IC",
+        "pct_paloma":"% Paloma","pct_fajardo":"% Fajardo","pot_ambos":"AE+Ambos",
+    }).reset_index(drop=True)
+    for _c in ["% AE","% IC","% Paloma","% Fajardo","AE+Ambos"]:
+        _av_tbl[_c] = _av_tbl[_c].apply(lambda v: f"{v:.1f}%")
+    _av_tbl["Válidos"] = _av_tbl["Válidos"].apply(lambda v: f"{int(v):,}")
+    _av_tbl["Mesas"]   = _av_tbl["Mesas"].apply(lambda v: f"{int(v):,}")
+    st.dataframe(_av_tbl, use_container_width=True, hide_index=True)
+
+    st.divider()
+
+    # ── Peor rendimiento AMVA ─────────────────────────────────────────────────
+    st.subheader("Puestos con peor rendimiento de Abelardo")
+
+    _avperf = _amva_p_all.copy()
+    _avperf["pct_ic"]     = (_avperf["v_ivan_cepeda"]     / _avperf["total_validos"] * 100).round(1)
+    _avperf["dif_ic_ae"]  = (_avperf["pct_ic"] - _avperf["pct_abelardo"]).round(1)
+    _avperf["pct_paloma"] = (_avperf["v_paloma_valencia"]  / _avperf["total_validos"] * 100).round(1)
+    _avperf["pct_fajardo"]= (_avperf["v_sergio_fajardo"]   / _avperf["total_validos"] * 100).round(1)
+    _avperf["pot_ambos"]  = (
+        (_avperf["votos_abelardo"] + _avperf["v_paloma_valencia"] + _avperf["v_sergio_fajardo"])
+        / _avperf["total_validos"] * 100
+    ).round(1)
+
+    _avic_wins = _avperf[_avperf["semaforo"] != "verde"].copy()
+    _avae_low  = _avperf[_avperf["semaforo"] == "verde"].nsmallest(20, "pct_abelardo").copy()
+    _avworst   = pd.concat([_avic_wins, _avae_low]).drop_duplicates("puesto").sort_values("pct_abelardo")
+
+    _avpw1, _avpw2 = st.columns([3, 2], gap="large")
+
+    with _avpw1:
+        _avws = _avworst.sort_values("pct_abelardo")
+        _fig_avpw = go.Figure()
+        _fig_avpw.add_trace(go.Bar(
+            name="Abelardo", y=_avws["puesto"], x=_avws["pct_abelardo"], orientation="h",
+            marker_color="#1f77b4",
+            text=_avws.apply(lambda r: f"{r['municipio'][:4]}· {r['pct_abelardo']:.1f}%", axis=1),
+            textposition="outside",
+            textfont=dict(size=9, color="#9A9A90", family="IBM Plex Mono"),
+        ))
+        _fig_avpw.add_trace(go.Bar(
+            name="Cepeda", y=_avws["puesto"], x=_avws["pct_ic"], orientation="h",
+            marker_color="#CC0000", text=None,
+        ))
+        _fig_avpw.update_layout(
+            barmode="group", height=max(340, len(_avws)*20),
+            margin=dict(l=0,r=70,t=10,b=0),
+            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#111111",
+            xaxis=dict(range=[0,100], ticksuffix="%", gridcolor="#1E1E1E",
+                       tickfont=dict(color="#9A9A90")),
+            yaxis=dict(gridcolor="rgba(0,0,0,0)", tickfont=dict(color="#9A9A90",size=8)),
+            legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="left", x=0,
+                        font=dict(color="#9A9A90",size=11), bgcolor="rgba(0,0,0,0)"),
+        )
+        st.plotly_chart(_fig_avpw, use_container_width=True, config={"displayModeBar": False})
+
+    with _avpw2:
+        st.markdown("##### Puestos donde Cepeda ganó")
+        if len(_avic_wins):
+            _avic_t = _avic_wins[[
+                "puesto","municipio","pct_abelardo","pct_ic",
+                "dif_ic_ae","pct_paloma","pct_fajardo","pot_ambos","total_validos",
+            ]].rename(columns={
+                "puesto":"Puesto","municipio":"Municipio",
+                "pct_abelardo":"% AE","pct_ic":"% IC","dif_ic_ae":"Dif IC–AE",
+                "pct_paloma":"% Paloma","pct_fajardo":"% Fajardo",
+                "pot_ambos":"AE+Ambos","total_validos":"Válidos",
+            }).sort_values("Dif IC–AE", ascending=False).reset_index(drop=True)
+            for _c in ["% AE","% IC","% Paloma","% Fajardo","AE+Ambos"]:
+                _avic_t[_c] = _avic_t[_c].apply(lambda v: f"{v:.1f}%")
+            _avic_t["Dif IC–AE"] = _avic_t["Dif IC–AE"].apply(lambda v: f"+{v:.1f}pp")
+            _avic_t["Válidos"]   = _avic_t["Válidos"].apply(lambda v: f"{int(v):,}")
+            st.dataframe(_avic_t, use_container_width=True, hide_index=True, height=520)
+            st.caption("AE+Ambos: % si Abelardo recibe el 100% de Paloma + Fajardo")
+        else:
+            st.info("Abelardo ganó en todos los puestos.")
+        st.markdown(f"**{len(_avic_wins)}** puestos ganados por Cepeda · "
+                    f"**{len(_avperf)-len(_avic_wins)}** por Abelardo")
+
+    st.divider()
+
+    # ── Mejores puestos Paloma y Fajardo AMVA ────────────────────────────────
+    st.subheader("Mejores puestos — Paloma Valencia y Sergio Fajardo")
+
+    _avpf1, _avpf2 = st.columns(2, gap="large")
+
+    def _av_top_bar(df_src, pct_col, label, color, n=20):
+        _df = df_src.nlargest(n, pct_col)[
+            ["puesto","municipio", pct_col,"pct_abelardo","pct_ic","pot_ambos","total_validos"]
+        ].copy()
+        _fig = go.Figure()
+        _fig.add_trace(go.Bar(
+            y=_df["puesto"], x=_df[pct_col], orientation="h",
+            name=label, marker_color=color,
+            text=_df.apply(lambda r: f"{r['municipio'][:4]}· {r[pct_col]:.1f}%", axis=1),
+            textposition="outside",
+            textfont=dict(size=9, color="#9A9A90", family="IBM Plex Mono"),
+            customdata=_df[["pct_abelardo","pct_ic","pot_ambos","total_validos","municipio"]].values,
+            hovertemplate=(
+                "<b>%{y}</b> · %{customdata[4]}<br>"
+                f"{label}: <b>%{{x:.1f}}%</b><br>"
+                "AE: %{customdata[0]:.1f}% · IC: %{customdata[1]:.1f}%<br>"
+                "AE+Ambos: %{customdata[2]:.1f}%<extra></extra>"
+            ),
+        ))
+        _fig.add_trace(go.Bar(
+            y=_df["puesto"], x=_df["pct_abelardo"], orientation="h",
+            name="Abelardo", marker_color="#1f77b4", opacity=0.5,
+            text=None, hoverinfo="skip",
+        ))
+        _fig.update_layout(
+            barmode="overlay", height=max(300, n*22),
+            margin=dict(l=0,r=65,t=10,b=0),
+            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#111111",
+            xaxis=dict(range=[0,60], ticksuffix="%", gridcolor="#1E1E1E",
+                       tickfont=dict(color="#9A9A90")),
+            yaxis=dict(gridcolor="rgba(0,0,0,0)", tickfont=dict(color="#9A9A90",size=9)),
+            legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="left", x=0,
+                        font=dict(color="#9A9A90",size=11), bgcolor="rgba(0,0,0,0)"),
+        )
+        return _fig, _df
+
+    with _avpf1:
+        st.markdown("##### Paloma Valencia — top 20")
+        _fig_avpal, _df_avpal = _av_top_bar(_avperf, "pct_paloma", "Paloma", "#2ca02c")
+        st.plotly_chart(_fig_avpal, use_container_width=True, config={"displayModeBar": False})
+        _t_avpal = _df_avpal[["puesto","municipio","pct_paloma","pct_abelardo",
+                               "pct_ic","pot_ambos","total_validos"]].rename(columns={
+            "puesto":"Puesto","municipio":"Municipio","pct_paloma":"% Paloma",
+            "pct_abelardo":"% AE","pct_ic":"% IC","pot_ambos":"AE+Ambos","total_validos":"Válidos"
+        }).reset_index(drop=True)
+        for _c in ["% Paloma","% AE","% IC","AE+Ambos"]:
+            _t_avpal[_c] = _t_avpal[_c].apply(lambda v: f"{v:.1f}%")
+        _t_avpal["Válidos"] = _t_avpal["Válidos"].apply(lambda v: f"{int(v):,}")
+        st.dataframe(_t_avpal, use_container_width=True, hide_index=True)
+
+    with _avpf2:
+        st.markdown("##### Sergio Fajardo — top 20")
+        _fig_avfaj, _df_avfaj = _av_top_bar(_avperf, "pct_fajardo", "Fajardo", "#ff7f0e")
+        st.plotly_chart(_fig_avfaj, use_container_width=True, config={"displayModeBar": False})
+        _t_avfaj = _df_avfaj[["puesto","municipio","pct_fajardo","pct_abelardo",
+                               "pct_ic","pot_ambos","total_validos"]].rename(columns={
+            "puesto":"Puesto","municipio":"Municipio","pct_fajardo":"% Fajardo",
+            "pct_abelardo":"% AE","pct_ic":"% IC","pot_ambos":"AE+Ambos","total_validos":"Válidos"
+        }).reset_index(drop=True)
+        for _c in ["% Fajardo","% AE","% IC","AE+Ambos"]:
+            _t_avfaj[_c] = _t_avfaj[_c].apply(lambda v: f"{v:.1f}%")
+        _t_avfaj["Válidos"] = _t_avfaj["Válidos"].apply(lambda v: f"{int(v):,}")
+        st.dataframe(_t_avfaj, use_container_width=True, hide_index=True)
 
 
 # ── Pie de página ─────────────────────────────────────────────────────────────
