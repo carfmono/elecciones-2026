@@ -4024,7 +4024,7 @@ with t_medellin:
     # ── Por comuna: AE% por grupo etario ─────────────────────────────────────
     st.markdown("##### AE% por grupo etario en cada comuna")
 
-    _seg_m_com = _med_m_seg.merge(_med_p_all[["puesto","comuna_label"]], on="puesto", how="left")
+    _seg_m_com = _med_m_seg  # ya tiene comuna_label desde load_medellin_data()
 
     _seg_com_all = (
         _seg_m_com.groupby(["comuna_label","segmento"])
