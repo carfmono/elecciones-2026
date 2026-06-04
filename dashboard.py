@@ -4050,9 +4050,9 @@ with t_medellin:
             size=_fp_coal["ms"],
             color=_fp_coal["pct_coal"],
             colorscale=[
-                [0.0, "#1565C0"],
+                [0.0, "#C0141C"],
                 [0.5, "#F5F5F5"],
-                [1.0, "#C0141C"],
+                [1.0, "#1565C0"],
             ],
             cmin=35, cmax=70,
             colorbar=dict(
