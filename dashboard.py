@@ -619,22 +619,6 @@ def load_medellin_data():
 _med_p_all, _med_m_all, _MED_COM_NAMES, _med_comunas_geo = load_medellin_data()
 
 
-def _build_age_segments(mesas_df):
-    _df = mesas_df[mesas_df["total_validos"] > 0].copy()
-    _df = _df.sort_values(["puesto", "mesa"])
-    _n    = _df.groupby("puesto")["mesa"].transform("count")
-    _rank = _df.groupby("puesto")["mesa"].rank(method="first")
-    _rel  = (_rank - 1) / (_n - 1).clip(lower=1)
-    _df["segmento"] = pd.cut(
-        _rel,
-        bins=[-0.001, 0.25, 0.5, 0.75, 1.001],
-        labels=["60+ años", "40–59 años", "25–39 años", "18–24 años"],
-    ).astype(str)
-    return _df
-
-
-_med_m_seg_global = _build_age_segments(_med_m_all)
-
 
 @st.cache_data
 def load_amva_data():
@@ -3769,7 +3753,17 @@ with t_medellin:
         "para aproximar cuatro grupos etarios."
     )
 
-    _med_m_seg = _med_m_seg_global
+    # Calcular segmento inline (no depende de cache ni de variables globales)
+    _med_m_seg = _med_m_all[_med_m_all["total_validos"] > 0].copy()
+    _med_m_seg = _med_m_seg.sort_values(["puesto", "mesa"])
+    _ms_n    = _med_m_seg.groupby("puesto")["mesa"].transform("count")
+    _ms_rank = _med_m_seg.groupby("puesto")["mesa"].rank(method="first")
+    _ms_rel  = (_ms_rank - 1) / (_ms_n - 1).clip(lower=1)
+    _med_m_seg["segmento"] = pd.cut(
+        _ms_rel,
+        bins=[-0.001, 0.25, 0.5, 0.75, 1.001],
+        labels=["60+ años", "40–59 años", "25–39 años", "18–24 años"],
+    ).astype(str)
 
     _SEG_ORDER  = ["60+ años", "40–59 años", "25–39 años", "18–24 años"]
     _SEG_COLORS = {
