@@ -619,8 +619,7 @@ def load_medellin_data():
 _med_p_all, _med_m_all, _MED_COM_NAMES, _med_comunas_geo = load_medellin_data()
 
 
-@st.cache_data
-def _build_age_segments_cached(mesas_df):
+def _build_age_segments(mesas_df):
     _df = mesas_df[mesas_df["total_validos"] > 0].copy()
     _df = _df.sort_values(["puesto", "mesa"])
     _n    = _df.groupby("puesto")["mesa"].transform("count")
@@ -634,7 +633,7 @@ def _build_age_segments_cached(mesas_df):
     return _df
 
 
-_med_m_seg_global = _build_age_segments_cached(_med_m_all)
+_med_m_seg_global = _build_age_segments(_med_m_all)
 
 
 @st.cache_data
