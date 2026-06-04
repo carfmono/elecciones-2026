@@ -591,6 +591,8 @@ df, mun, pre, geo_depts, geo_munis, geo_ant = load_data()
 def load_medellin_data():
     _p = pd.read_csv("resultados/medellin_puestos.csv")
     _m = pd.read_csv("resultados/medellin_mesas.csv")
+    with open("resultados/rv_comunas_medellin.geojson", encoding="utf-8") as _f:
+        _comunas_geo = json.load(_f)
     _COM_NAMES = {
         0: "Sin asignar",
         1: "C1 · Popular",          2: "C2 · Santa Cruz",
@@ -611,10 +613,10 @@ def load_medellin_data():
     _m["cod_comuna"]  = _m["cod_comuna"].fillna(0).astype(int)
     _p["comuna_label"] = _p["cod_comune"].map(_COM_NAMES).fillna("Sin asignar")
     _m["comuna_label"] = _m["cod_comuna"].map(_COM_NAMES).fillna("Sin asignar")
-    return _p, _m, _COM_NAMES
+    return _p, _m, _COM_NAMES, _comunas_geo
 
 
-_med_p_all, _med_m_all, _MED_COM_NAMES = load_medellin_data()
+_med_p_all, _med_m_all, _MED_COM_NAMES, _med_comunas_geo = load_medellin_data()
 
 
 # ── Tema oscuro editorial (fijo) ──────────────────────────────────────────────
@@ -2543,7 +2545,7 @@ with t_medellin:
         _d_puestos_df = _med_p_all[_med_p_all["comuna_label"] == _d_sel_com].copy()
         _d_mesas_pool = _med_m_all[_med_m_all["comuna_label"] == _d_sel_com].copy()
 
-    _d_puesto_opts = sorted(_d_puestos_df["puesto"].unique().tolist())
+    _d_puesto_opts = ["— Sin seleccionar —"] + sorted(_d_puestos_df["puesto"].unique().tolist())
     with _flt3:
         _d_sel_puesto = st.selectbox("Drill-down — puesto",
                                      _d_puesto_opts, key="drill_puesto")
@@ -2610,10 +2612,33 @@ with t_medellin:
         _map_ae  = _map_df[_map_df["semaforo"] == "verde"].copy()
         _map_ic  = _map_df[_map_df["semaforo"] != "verde"].copy()
 
-        # Puesto seleccionado para highlight
-        _map_sel = _map_df[_map_df["puesto"] == _d_sel_puesto].copy()
+        # Puesto seleccionado para highlight (vacío si no hay selección)
+        _map_sel = (
+            _map_df[_map_df["puesto"] == _d_sel_puesto].copy()
+            if _d_sel_puesto != "— Sin seleccionar —"
+            else pd.DataFrame()
+        )
 
         _fig_map = go.Figure()
+
+        # Trace 0: polígonos de comunas (fondo vectorial)
+        _com_ids   = [f["properties"]["codigo"] for f in _med_comunas_geo["features"]]
+        _com_names = [
+            f["properties"].get("identificacion", "") + " · " + f["properties"].get("nombre", "")
+            for f in _med_comunas_geo["features"]
+        ]
+        _fig_map.add_trace(go.Choroplethmapbox(
+            geojson=_med_comunas_geo,
+            locations=_com_ids,
+            z=[0] * len(_com_ids),
+            featureidkey="properties.codigo",
+            colorscale=[[0, "rgba(200,200,200,0.15)"], [1, "rgba(200,200,200,0.15)"]],
+            showscale=False,
+            marker=dict(line=dict(color="#888888", width=1.2), opacity=0.5),
+            text=_com_names,
+            hovertemplate="%{text}<extra></extra>",
+            name="Comunas",
+        ))
 
         # Trace 1: Abelardo gana → gradiente azul (claro → oscuro por % AE)
         if len(_map_ae):
@@ -2777,201 +2802,193 @@ with t_medellin:
     st.divider()
 
     # ── Drill-down: Mesa a mesa del puesto seleccionado ───────────────────────
-    st.subheader(f"Análisis mesa a mesa — {_d_sel_puesto}")
+    st.subheader("Análisis mesa a mesa")
 
-    # ── Mesas del puesto seleccionado ─────────────────────────────────────────
-    _d_mesas = _d_mesas_pool[
-        _d_mesas_pool["puesto"] == _d_sel_puesto
-    ].sort_values("mesa").copy()
-    _d_mesas_v = _d_mesas[_d_mesas["total_validos"] > 0].copy()
-
-    if _d_mesas_v.empty:
-        st.info("No hay mesas con datos para este puesto.")
+    if _d_sel_puesto == "— Sin seleccionar —":
+        st.info("Selecciona un puesto en el selector o haz clic sobre un punto en el mapa para ver el análisis mesa a mesa.")
     else:
-        # Métricas del puesto
-        _d_ae  = int(_d_mesas_v["v_abelardo_de_la_espriella"].sum())
-        _d_ic  = int(_d_mesas_v["v_ivan_cepeda"].sum())
-        _d_pal = int(_d_mesas_v["v_paloma_valencia"].sum())
-        _d_faj = int(_d_mesas_v["v_sergio_fajardo"].sum())
-        _d_val = int(_d_mesas_v["total_validos"].sum())
-        _d_nm  = len(_d_mesas_v)
+        # Mesas del puesto seleccionado ───────────────────────────────────────
+        _d_mesas = _d_mesas_pool[
+            _d_mesas_pool["puesto"] == _d_sel_puesto
+        ].sort_values("mesa").copy()
+        _d_mesas_v = _d_mesas[_d_mesas["total_validos"] > 0].copy()
 
-        _dm1, _dm2, _dm3, _dm4, _dm5, _dm6 = st.columns(6)
-        _dm1.metric("Abelardo",  f"{_d_ae:,}",
-                    f"{_d_ae/_d_val*100:.1f}%", delta_color="off")
-        _dm2.metric("Cepeda",    f"{_d_ic:,}",
-                    f"{_d_ic/_d_val*100:.1f}%", delta_color="off")
-        _dm3.metric("Paloma",    f"{_d_pal:,}",
-                    f"{_d_pal/_d_val*100:.1f}%", delta_color="off")
-        _dm4.metric("Fajardo",   f"{_d_faj:,}",
-                    f"{_d_faj/_d_val*100:.1f}%", delta_color="off")
-        _dm5.metric("Válidos",   f"{_d_val:,}")
-        _dm6.metric("Mesas",     str(_d_nm))
+        if _d_mesas_v.empty:
+            st.info("No hay mesas con datos para este puesto.")
+        else:
+            # Métricas del puesto
+            _d_ae  = int(_d_mesas_v["v_abelardo_de_la_espriella"].sum())
+            _d_ic  = int(_d_mesas_v["v_ivan_cepeda"].sum())
+            _d_pal = int(_d_mesas_v["v_paloma_valencia"].sum())
+            _d_faj = int(_d_mesas_v["v_sergio_fajardo"].sum())
+            _d_val = int(_d_mesas_v["total_validos"].sum())
+            _d_nm  = len(_d_mesas_v)
 
-        st.markdown("")
+            _dm1, _dm2, _dm3, _dm4, _dm5, _dm6 = st.columns(6)
+            _dm1.metric("Abelardo",  f"{_d_ae:,}",
+                        f"{_d_ae/_d_val*100:.1f}%", delta_color="off")
+            _dm2.metric("Cepeda",    f"{_d_ic:,}",
+                        f"{_d_ic/_d_val*100:.1f}%", delta_color="off")
+            _dm3.metric("Paloma",    f"{_d_pal:,}",
+                        f"{_d_pal/_d_val*100:.1f}%", delta_color="off")
+            _dm4.metric("Fajardo",   f"{_d_faj:,}",
+                        f"{_d_faj/_d_val*100:.1f}%", delta_color="off")
+            _dm5.metric("Válidos",   f"{_d_val:,}")
+            _dm6.metric("Mesas",     str(_d_nm))
 
-        # ── Gráfico 1: barras apiladas % por mesa ────────────────────────────
-        _mesa_labels = [f"Mesa {int(r)}" for r in _d_mesas_v["mesa"]]
+            st.markdown("")
 
-        _fig_stk = go.Figure()
-        for _col, (_lbl, _clr) in _CANDS_4.items():
-            _vals = _d_mesas_v[_col].values
-            _pcts = (_vals / _d_mesas_v["total_validos"].values * 100).round(1)
+            # ── Gráfico 1: barras apiladas % por mesa ────────────────────────────
+            _mesa_labels = [f"Mesa {int(r)}" for r in _d_mesas_v["mesa"]]
+
+            _fig_stk = go.Figure()
+            for _col, (_lbl, _clr) in _CANDS_4.items():
+                _vals = _d_mesas_v[_col].values
+                _pcts = (_vals / _d_mesas_v["total_validos"].values * 100).round(1)
+                _fig_stk.add_trace(go.Bar(
+                    name=_lbl,
+                    x=_mesa_labels,
+                    y=_pcts,
+                    marker_color=_clr,
+                    text=[f"{v:.0f}%" for v in _pcts],
+                    textposition="inside",
+                    insidetextanchor="middle",
+                    textfont=dict(size=9, color="#FFFFFF", family="IBM Plex Mono"),
+                    customdata=_vals,
+                    hovertemplate=(
+                        f"<b>{_lbl}</b><br>"
+                        "%{y:.1f}% · %{customdata:,} votos<extra></extra>"
+                    ),
+                ))
+
+            # Calcular "Otros" para completar el 100%
+            _otros_vals = (_d_mesas_v["total_validos"].values
+                           - sum(_d_mesas_v[c].values for c in _CANDS_4))
+            _otros_pcts = (_otros_vals / _d_mesas_v["total_validos"].values * 100).round(1)
             _fig_stk.add_trace(go.Bar(
-                name=_lbl,
+                name="Otros",
                 x=_mesa_labels,
-                y=_pcts,
-                marker_color=_clr,
-                text=[f"{v:.0f}%" for v in _pcts],
-                textposition="inside",
-                insidetextanchor="middle",
-                textfont=dict(size=9, color="#FFFFFF", family="IBM Plex Mono"),
-                customdata=_vals,
-                hovertemplate=(
-                    f"<b>{_lbl}</b><br>"
-                    "%{y:.1f}% · %{customdata:,} votos<extra></extra>"
+                y=_otros_pcts,
+                marker_color="#555555",
+                text=None,
+                hovertemplate="<b>Otros</b><br>%{y:.1f}%<extra></extra>",
+            ))
+
+            _fig_stk.update_layout(
+                barmode="stack",
+                height=360,
+                margin=dict(l=0, r=0, t=10, b=0),
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="#111111",
+                xaxis=dict(
+                    tickfont=dict(color="#9A9A90", size=10),
+                    gridcolor="rgba(0,0,0,0)",
                 ),
-            ))
+                yaxis=dict(
+                    ticksuffix="%",
+                    range=[0, 100],
+                    gridcolor="#1E1E1E",
+                    tickfont=dict(color="#9A9A90"),
+                ),
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom", y=1.02,
+                    xanchor="left", x=0,
+                    font=dict(color="#9A9A90", size=11),
+                    bgcolor="rgba(0,0,0,0)",
+                ),
+            )
+            st.plotly_chart(_fig_stk, use_container_width=True,
+                            config={"displayModeBar": False})
 
-        # Calcular "Otros" para completar el 100%
-        _otros_vals = (_d_mesas_v["total_validos"].values
-                       - sum(_d_mesas_v[c].values for c in _CANDS_4))
-        _otros_pcts = (_otros_vals / _d_mesas_v["total_validos"].values * 100).round(1)
-        _fig_stk.add_trace(go.Bar(
-            name="Otros",
-            x=_mesa_labels,
-            y=_otros_pcts,
-            marker_color="#555555",
-            text=None,
-            hovertemplate="<b>Otros</b><br>%{y:.1f}%<extra></extra>",
-        ))
+            # ── Gráfico 2: líneas de % por mesa (comparativo 4 candidatos) ───────
+            _fig_lin = go.Figure()
+            for _col, (_lbl, _clr) in _CANDS_4.items():
+                _pcts = (_d_mesas_v[_col].values
+                         / _d_mesas_v["total_validos"].values * 100).round(1)
+                _fig_lin.add_trace(go.Scatter(
+                    x=_mesa_labels,
+                    y=_pcts,
+                    mode="lines+markers",
+                    name=_lbl,
+                    line=dict(color=_clr, width=2.5),
+                    marker=dict(size=8, color=_clr),
+                    hovertemplate=f"<b>{_lbl}</b> · %{{y:.1f}}<extra></extra>",
+                ))
 
-        _fig_stk.update_layout(
-            barmode="stack",
-            height=360,
-            margin=dict(l=0, r=0, t=10, b=0),
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="#111111",
-            xaxis=dict(
-                tickfont=dict(color="#9A9A90", size=10),
-                gridcolor="rgba(0,0,0,0)",
-            ),
-            yaxis=dict(
-                ticksuffix="%",
-                range=[0, 100],
-                gridcolor="#1E1E1E",
-                tickfont=dict(color="#9A9A90"),
-            ),
-            legend=dict(
-                orientation="h",
-                yanchor="bottom", y=1.02,
-                xanchor="left", x=0,
-                font=dict(color="#9A9A90", size=11),
-                bgcolor="rgba(0,0,0,0)",
-            ),
-        )
-        st.plotly_chart(_fig_stk, use_container_width=True,
-                        config={"displayModeBar": False})
+            _avg_ae = _d_mesas_v["v_abelardo_de_la_espriella"].sum() / _d_mesas_v["total_validos"].sum() * 100
+            _fig_lin.add_hline(
+                y=_avg_ae,
+                line_dash="dot", line_color="#1f77b4", line_width=1,
+                annotation_text=f"AE prom. {_avg_ae:.1f}%",
+                annotation_font=dict(color="#1f77b4", size=10),
+                annotation_position="right",
+            )
+            _fig_lin.update_layout(
+                height=300,
+                margin=dict(l=0, r=80, t=10, b=0),
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="#111111",
+                xaxis=dict(
+                    tickfont=dict(color="#9A9A90", size=10),
+                    gridcolor="#1E1E1E",
+                ),
+                yaxis=dict(
+                    ticksuffix="%",
+                    gridcolor="#1E1E1E",
+                    tickfont=dict(color="#9A9A90"),
+                ),
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom", y=1.02,
+                    xanchor="left", x=0,
+                    font=dict(color="#9A9A90", size=11),
+                    bgcolor="rgba(0,0,0,0)",
+                ),
+            )
+            st.plotly_chart(_fig_lin, use_container_width=True,
+                            config={"displayModeBar": False})
 
-        # ── Gráfico 2: líneas de % por mesa (comparativo 4 candidatos) ───────
-        _fig_lin = go.Figure()
-        for _col, (_lbl, _clr) in _CANDS_4.items():
-            _pcts = (_d_mesas_v[_col].values
-                     / _d_mesas_v["total_validos"].values * 100).round(1)
-            _fig_lin.add_trace(go.Scatter(
-                x=_mesa_labels,
-                y=_pcts,
-                mode="lines+markers",
-                name=_lbl,
-                line=dict(color=_clr, width=2.5),
-                marker=dict(size=8, color=_clr),
-                hovertemplate=f"<b>{_lbl}</b> · %{{y:.1f}}<extra></extra>",
-            ))
+            st.divider()
 
-        _avg_ae = _d_mesas_v["v_abelardo_de_la_espriella"].sum() / _d_mesas_v["total_validos"].sum() * 100
-        _fig_lin.add_hline(
-            y=_avg_ae,
-            line_dash="dot", line_color="#1f77b4", line_width=1,
-            annotation_text=f"AE prom. {_avg_ae:.1f}%",
-            annotation_font=dict(color="#1f77b4", size=10),
-            annotation_position="right",
-        )
-        _fig_lin.update_layout(
-            height=300,
-            margin=dict(l=0, r=80, t=10, b=0),
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="#111111",
-            xaxis=dict(
-                tickfont=dict(color="#9A9A90", size=10),
-                gridcolor="#1E1E1E",
-            ),
-            yaxis=dict(
-                ticksuffix="%",
-                gridcolor="#1E1E1E",
-                tickfont=dict(color="#9A9A90"),
-            ),
-            legend=dict(
-                orientation="h",
-                yanchor="bottom", y=1.02,
-                xanchor="left", x=0,
-                font=dict(color="#9A9A90", size=11),
-                bgcolor="rgba(0,0,0,0)",
-            ),
-        )
-        st.plotly_chart(_fig_lin, use_container_width=True,
-                        config={"displayModeBar": False})
+            # ── Top / Bottom mesas ────────────────────────────────────────────────
+            _tb_l, _tb_r = st.columns(2)
 
-        st.divider()
+            _d_mesas_v["sem_icon"] = _d_mesas_v["semaforo"].map(
+                {"verde": "🟢 1°", "amarillo": "🟡 2°", "rojo": "🔴 3°+"}
+            ).fillna("⚪")
 
-        # ── Top / Bottom mesas ────────────────────────────────────────────────
-        _tb_l, _tb_r = st.columns(2)
+            _rank_cols = ["mesa", "votos_abelardo", "v_ivan_cepeda",
+                          "v_paloma_valencia", "v_sergio_fajardo",
+                          "total_validos", "pct_abelardo", "sem_icon"]
+            _rank_rename = {
+                "mesa":                  "Mesa",
+                "votos_abelardo":        "Abelardo",
+                "v_ivan_cepeda":         "Cepeda",
+                "v_paloma_valencia":     "Paloma",
+                "v_sergio_fajardo":      "Fajardo",
+                "total_validos":         "Válidos",
+                "pct_abelardo":          "% AE",
+                "sem_icon":              "Pos.",
+            }
 
-        _d_mesas_v["sem_icon"] = _d_mesas_v["semaforo"].map(
-            {"verde": "🟢 1°", "amarillo": "🟡 2°", "rojo": "🔴 3°+"}
-        ).fillna("⚪")
+            def _fmt_rank(df_in):
+                df_o = df_in[_rank_cols].rename(columns=_rank_rename).reset_index(drop=True).copy()
+                df_o["% AE"]    = df_o["% AE"].apply(lambda v: f"{v:.1f}%")
+                for _c in ["Abelardo", "Cepeda", "Paloma", "Fajardo", "Válidos"]:
+                    df_o[_c] = df_o[_c].apply(lambda v: f"{int(v):,}")
+                return df_o
 
-        _rank_cols = ["mesa", "votos_abelardo", "v_ivan_cepeda",
-                      "v_paloma_valencia", "v_sergio_fajardo",
-                      "total_validos", "pct_abelardo", "sem_icon"]
-        _rank_rename = {
-            "mesa":                  "Mesa",
-            "votos_abelardo":        "Abelardo",
-            "v_ivan_cepeda":         "Cepeda",
-            "v_paloma_valencia":     "Paloma",
-            "v_sergio_fajardo":      "Fajardo",
-            "total_validos":         "Válidos",
-            "pct_abelardo":          "% AE",
-            "sem_icon":              "Pos.",
-        }
+            with _tb_l:
+                st.markdown("##### Mayor % Abelardo")
+                st.dataframe(_fmt_rank(_d_mesas_v.nlargest(10, "pct_abelardo")),
+                             use_container_width=True, hide_index=True)
 
-        def _fmt_rank(df_in):
-            df_o = df_in[_rank_cols].rename(columns=_rank_rename).reset_index(drop=True).copy()
-            df_o["% AE"]    = df_o["% AE"].apply(lambda v: f"{v:.1f}%")
-            for _c in ["Abelardo", "Cepeda", "Paloma", "Fajardo", "Válidos"]:
-                df_o[_c] = df_o[_c].apply(lambda v: f"{int(v):,}")
-            return df_o
+            with _tb_r:
+                st.markdown("##### Menor % Abelardo")
+                st.dataframe(_fmt_rank(_d_mesas_v.nsmallest(10, "pct_abelardo")),
+                             use_container_width=True, hide_index=True)
 
-        with _tb_l:
-            st.markdown("##### Mayor % Abelardo")
-            st.dataframe(_fmt_rank(_d_mesas_v.nlargest(10, "pct_abelardo")),
-                         use_container_width=True, hide_index=True)
-
-        with _tb_r:
-            st.markdown("##### Menor % Abelardo")
-            st.dataframe(_fmt_rank(_d_mesas_v.nsmallest(10, "pct_abelardo")),
-                         use_container_width=True, hide_index=True)
-
-        st.divider()
-
-        # ── Tabla completa del puesto ─────────────────────────────────────────
-        st.subheader(f"Todas las mesas — {_d_sel_puesto}")
-
-        _tbl_full = _d_mesas_v[_rank_cols].rename(columns=_rank_rename).copy()
-        _tbl_full["% AE"] = _tbl_full["% AE"].apply(lambda v: f"{v:.1f}%")
-        for _c in ["Abelardo", "Cepeda", "Paloma", "Fajardo", "Válidos"]:
-            _tbl_full[_c] = _tbl_full[_c].apply(lambda v: f"{int(v):,}")
-        st.dataframe(_tbl_full.reset_index(drop=True),
-                     use_container_width=True, hide_index=True, height=400)
 
     st.divider()
 
@@ -2980,7 +2997,22 @@ with t_medellin:
 
     _perf_df = _med_p_all.copy()
     _perf_df["v_ivan_cepeda_pct"] = (
-        _perf_df.get("v_ivan_cepeda", 0) / _perf_df["total_validos"] * 100
+        _perf_df["v_ivan_cepeda"] / _perf_df["total_validos"] * 100
+    ).round(1)
+    _perf_df["dif_ic_ae"] = (
+        _perf_df["v_ivan_cepeda_pct"] - _perf_df["pct_abelardo"]
+    ).round(1)
+    _perf_df["pot_paloma"] = (
+        (_perf_df["votos_abelardo"] + _perf_df["v_paloma_valencia"])
+        / _perf_df["total_validos"] * 100
+    ).round(1)
+    _perf_df["pot_fajardo"] = (
+        (_perf_df["votos_abelardo"] + _perf_df["v_sergio_fajardo"])
+        / _perf_df["total_validos"] * 100
+    ).round(1)
+    _perf_df["pot_ambos"] = (
+        (_perf_df["votos_abelardo"] + _perf_df["v_paloma_valencia"] + _perf_df["v_sergio_fajardo"])
+        / _perf_df["total_validos"] * 100
     ).round(1)
 
     # Los 25 puestos donde Cepeda ganó (semaforo amarillo/rojo)
@@ -3044,19 +3076,32 @@ with t_medellin:
         if len(_ic_wins):
             _ic_tbl = _ic_wins[[
                 "puesto", "comuna_label", "pct_abelardo",
-                "v_ivan_cepeda_pct", "total_validos",
+                "v_ivan_cepeda_pct", "dif_ic_ae",
+                "pot_paloma", "pot_fajardo", "pot_ambos",
+                "total_validos",
             ]].rename(columns={
-                "puesto":          "Puesto",
-                "comuna_label":    "Comuna",
-                "pct_abelardo":    "% AE",
+                "puesto":            "Puesto",
+                "comuna_label":      "Comuna",
+                "pct_abelardo":      "% AE",
                 "v_ivan_cepeda_pct": "% IC",
-                "total_validos":   "Válidos",
-            }).sort_values("% IC", ascending=False).reset_index(drop=True)
-            _ic_tbl["% AE"]   = _ic_tbl["% AE"].apply(lambda v: f"{v:.1f}%")
-            _ic_tbl["% IC"]   = _ic_tbl["% IC"].apply(lambda v: f"{v:.1f}%")
-            _ic_tbl["Válidos"] = _ic_tbl["Válidos"].apply(lambda v: f"{int(v):,}")
+                "dif_ic_ae":         "Dif IC–AE",
+                "pot_paloma":        "AE+Paloma",
+                "pot_fajardo":       "AE+Fajardo",
+                "pot_ambos":         "AE+Ambos",
+                "total_validos":     "Válidos",
+            }).sort_values("Dif IC–AE", ascending=False).reset_index(drop=True)
+
+            for _c in ["% AE", "% IC", "AE+Paloma", "AE+Fajardo", "AE+Ambos"]:
+                _ic_tbl[_c] = _ic_tbl[_c].apply(lambda v: f"{v:.1f}%")
+            _ic_tbl["Dif IC–AE"] = _ic_tbl["Dif IC–AE"].apply(lambda v: f"+{v:.1f}pp")
+            _ic_tbl["Válidos"]   = _ic_tbl["Válidos"].apply(lambda v: f"{int(v):,}")
+
             st.dataframe(_ic_tbl, use_container_width=True,
-                         hide_index=True, height=500)
+                         hide_index=True, height=540)
+            st.caption(
+                "AE+Paloma / AE+Fajardo / AE+Ambos: % que obtendría Abelardo "
+                "si recibiera el 100% de esos votos en 2ª vuelta"
+            )
         else:
             st.info("Abelardo ganó en todos los puestos del filtro actual.")
 
