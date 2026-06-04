@@ -3742,6 +3742,255 @@ with t_medellin:
         _tbl_faj["Válidos"] = _tbl_faj["Válidos"].apply(lambda v: f"{int(v):,}")
         st.dataframe(_tbl_faj, use_container_width=True, hide_index=True)
 
+    st.divider()
+
+    # ── Segmentación etaria ───────────────────────────────────────────────────
+    st.subheader("Segmentación etaria – Medellín")
+    st.caption(
+        "Dentro de cada puesto, la mesa 1 corresponde a los votantes de mayor edad y la última mesa "
+        "a los de 18–19 años. Se divide cada puesto en cuartiles de posición relativa de mesa "
+        "para aproximar cuatro grupos etarios."
+    )
+
+    # Calcular segmento de edad para cada mesa (por posición relativa dentro del puesto)
+    @st.cache_data
+    def _build_age_segments(mesas_df):
+        _df = mesas_df[mesas_df["total_validos"] > 0].copy()
+        _df = _df.sort_values(["puesto", "mesa"])
+
+        def _seg(g):
+            n = len(g)
+            g = g.copy()
+            if n == 1:
+                g["segmento"] = "40–59 años"
+                return g
+            g["_r"] = (g["mesa"].rank(method="first") - 1) / (n - 1)
+            g["segmento"] = pd.cut(
+                g["_r"],
+                bins=[-0.001, 0.25, 0.5, 0.75, 1.001],
+                labels=["60+ años", "40–59 años", "25–39 años", "18–24 años"],
+            ).astype(str)
+            return g.drop(columns=["_r"])
+
+        return _df.groupby("puesto", group_keys=False).apply(_seg)
+
+    _med_m_seg = _build_age_segments(_med_m_all)
+
+    _SEG_ORDER  = ["60+ años", "40–59 años", "25–39 años", "18–24 años"]
+    _SEG_COLORS = {
+        "60+ años":    "#6e40aa",
+        "40–59 años":  "#3f91c4",
+        "25–39 años":  "#3db37e",
+        "18–24 años":  "#f2c12e",
+    }
+
+    # Agregado ciudad por segmento
+    _seg_city = (
+        _med_m_seg.groupby("segmento")
+        .agg(
+            mesas   =("mesa",                      "count"),
+            v_ae    =("v_abelardo_de_la_espriella", "sum"),
+            v_ic    =("v_ivan_cepeda",              "sum"),
+            v_paloma=("v_paloma_valencia",          "sum"),
+            v_fajardo=("v_sergio_fajardo",          "sum"),
+            total   =("total_validos",              "sum"),
+        ).reset_index()
+    )
+    _seg_city["pct_ae"]     = (_seg_city["v_ae"]      / _seg_city["total"] * 100).round(1)
+    _seg_city["pct_ic"]     = (_seg_city["v_ic"]      / _seg_city["total"] * 100).round(1)
+    _seg_city["pct_paloma"] = (_seg_city["v_paloma"]  / _seg_city["total"] * 100).round(1)
+    _seg_city["pct_fajardo"]= (_seg_city["v_fajardo"] / _seg_city["total"] * 100).round(1)
+    _seg_city["pct_otros"]  = (
+        (_seg_city["total"] - _seg_city[["v_ae","v_ic","v_paloma","v_fajardo"]].sum(axis=1))
+        / _seg_city["total"] * 100
+    ).round(1).clip(lower=0)
+    _seg_city["segmento"] = pd.Categorical(_seg_city["segmento"], categories=_SEG_ORDER, ordered=True)
+    _seg_city = _seg_city.sort_values("segmento")
+
+    # Métricas clave: diferencia entre extremos
+    _sc_mayor = _seg_city[_seg_city["segmento"] == "60+ años"].iloc[0]
+    _sc_joven = _seg_city[_seg_city["segmento"] == "18–24 años"].iloc[0]
+
+    _em1, _em2, _em3, _em4 = st.columns(4)
+    _em1.metric("AE — 60+ años",    f"{_sc_mayor['pct_ae']:.1f}%")
+    _em2.metric("AE — 18-24 años",  f"{_sc_joven['pct_ae']:.1f}%",
+                f"{_sc_joven['pct_ae'] - _sc_mayor['pct_ae']:+.1f}pp vs mayores", delta_color="normal")
+    _em3.metric("IC — 60+ años",    f"{_sc_mayor['pct_ic']:.1f}%")
+    _em4.metric("IC — 18-24 años",  f"{_sc_joven['pct_ic']:.1f}%",
+                f"{_sc_joven['pct_ic'] - _sc_mayor['pct_ic']:+.1f}pp vs mayores", delta_color="inverse")
+
+    st.divider()
+
+    _etcol1, _etcol2 = st.columns([3, 2], gap="large")
+
+    with _etcol1:
+        # Barras apiladas 100% por segmento
+        st.markdown("##### Composición del voto por grupo etario")
+        _fig_et_stack = go.Figure()
+        for _col, _lbl, _clr in [
+            ("pct_ae", "Abelardo", "#1f77b4"),
+            ("pct_ic", "Cepeda",   "#CC0000"),
+            ("pct_paloma", "Paloma", "#2ca02c"),
+            ("pct_fajardo", "Fajardo", "#ff7f0e"),
+            ("pct_otros", "Otros", "#555555"),
+        ]:
+            _fig_et_stack.add_trace(go.Bar(
+                name=_lbl,
+                x=_seg_city["segmento"],
+                y=_seg_city[_col],
+                marker_color=_clr,
+                text=_seg_city[_col].apply(lambda v: f"{v:.1f}%"),
+                textposition="inside", insidetextanchor="middle",
+                textfont=dict(size=11, color="#FFFFFF", family="IBM Plex Mono"),
+                hovertemplate=f"<b>{_lbl}</b><br>%{{x}}: %{{y:.1f}}%<extra></extra>",
+            ))
+        _fig_et_stack.update_layout(
+            barmode="stack", height=380,
+            margin=dict(l=0, r=0, t=10, b=0),
+            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#111111",
+            xaxis=dict(tickfont=dict(color="#C8C8C0", size=12), gridcolor="rgba(0,0,0,0)"),
+            yaxis=dict(ticksuffix="%", range=[0, 100], gridcolor="#1E1E1E",
+                       tickfont=dict(color="#9A9A90")),
+            legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="left", x=0,
+                        font=dict(color="#9A9A90", size=11), bgcolor="rgba(0,0,0,0)"),
+        )
+        st.plotly_chart(_fig_et_stack, use_container_width=True, config={"displayModeBar": False})
+
+    with _etcol2:
+        # Líneas AE vs IC por segmento (tendencia)
+        st.markdown("##### Tendencia Abelardo vs Cepeda por edad")
+        _fig_et_line = go.Figure()
+        for _col, _lbl, _clr in [
+            ("pct_ae",     "Abelardo", "#1f77b4"),
+            ("pct_ic",     "Cepeda",   "#CC0000"),
+            ("pct_paloma", "Paloma",   "#2ca02c"),
+            ("pct_fajardo","Fajardo",  "#ff7f0e"),
+        ]:
+            _fig_et_line.add_trace(go.Scatter(
+                x=_seg_city["segmento"],
+                y=_seg_city[_col],
+                mode="lines+markers+text",
+                name=_lbl,
+                line=dict(color=_clr, width=2.5),
+                marker=dict(size=10, color=_clr),
+                text=_seg_city[_col].apply(lambda v: f"{v:.1f}%"),
+                textposition="top center",
+                textfont=dict(size=10, color=_clr, family="IBM Plex Mono"),
+                hovertemplate=f"<b>{_lbl}</b><br>%{{x}}: %{{y:.1f}}%<extra></extra>",
+            ))
+        _fig_et_line.update_layout(
+            height=380, margin=dict(l=0, r=20, t=10, b=0),
+            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#111111",
+            xaxis=dict(tickfont=dict(color="#C8C8C0", size=11), gridcolor="#1E1E1E"),
+            yaxis=dict(ticksuffix="%", gridcolor="#1E1E1E", tickfont=dict(color="#9A9A90"),
+                       range=[0, max(_seg_city["pct_ae"].max(), _seg_city["pct_ic"].max()) + 8]),
+            legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="left", x=0,
+                        font=dict(color="#9A9A90", size=11), bgcolor="rgba(0,0,0,0)"),
+        )
+        st.plotly_chart(_fig_et_line, use_container_width=True, config={"displayModeBar": False})
+
+    st.divider()
+
+    # ── Scatter: AE en mayores vs AE en jóvenes por puesto ───────────────────
+    st.markdown("##### Consistencia por puesto: AE% en adultos mayores vs jóvenes")
+    st.caption("Cada punto es un puesto. Encima de la diagonal = AE mejora con juventud; debajo = AE mejora con edad.")
+
+    _seg_pivot = (
+        _med_m_seg.groupby(["puesto","segmento"])
+        .agg(
+            v_ae=("v_abelardo_de_la_espriella", "sum"),
+            total=("total_validos", "sum"),
+        ).reset_index()
+    )
+    _seg_pivot["pct_ae"] = (_seg_pivot["v_ae"] / _seg_pivot["total"] * 100).round(1)
+    _seg_wide = _seg_pivot.pivot(index="puesto", columns="segmento", values="pct_ae").reset_index()
+    _seg_wide = _seg_wide.merge(
+        _med_p_all[["puesto","comuna_label","total_validos","semaforo"]], on="puesto", how="left"
+    ).dropna(subset=["60+ años","18–24 años"])
+
+    _fig_scat_et = px.scatter(
+        _seg_wide,
+        x="60+ años", y="18–24 años",
+        color="semaforo",
+        color_discrete_map={"verde": "#1f77b4", "amarillo": "#ff7f0e", "rojo": "#CC0000"},
+        size="total_validos",
+        hover_name="puesto",
+        hover_data={"comuna_label": True, "60+ años": ":.1f", "18–24 años": ":.1f",
+                    "semaforo": False, "total_validos": ":,"},
+        labels={"60+ años": "AE% — 60+ años", "18–24 años": "AE% — 18-24 años",
+                "semaforo": "Posición AE", "total_validos": "Votos válidos",
+                "comuna_label": "Comuna"},
+        opacity=0.8,
+    )
+    _max_et = max(_seg_wide["60+ años"].max(), _seg_wide["18–24 años"].max()) + 5
+    _fig_scat_et.add_shape(
+        type="line", x0=0, y0=0, x1=_max_et, y1=_max_et,
+        line=dict(color="#888", dash="dot", width=1),
+    )
+    _fig_scat_et.update_layout(
+        height=460,
+        margin=dict(l=0, r=0, t=10, b=0),
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#111111",
+        xaxis=dict(ticksuffix="%", gridcolor="#1E1E1E", tickfont=dict(color="#9A9A90")),
+        yaxis=dict(ticksuffix="%", gridcolor="#1E1E1E", tickfont=dict(color="#9A9A90")),
+        legend=dict(title="Posición AE", font=dict(color="#9A9A90"),
+                    bgcolor="rgba(0,0,0,0)"),
+    )
+    st.plotly_chart(_fig_scat_et, use_container_width=True, config={"displayModeBar": False})
+
+    st.divider()
+
+    # ── Por comuna: AE% por grupo etario ─────────────────────────────────────
+    st.markdown("##### AE% por grupo etario en cada comuna")
+
+    _seg_com = (
+        _med_m_seg.merge(_med_p_all[["puesto","comuna_label"]], on="puesto", how="left")
+        .groupby(["comuna_label","segmento"])
+        .agg(v_ae=("v_abelardo_de_la_espriella","sum"), total=("total_validos","sum"))
+        .reset_index()
+    )
+    _seg_com["pct_ae"] = (_seg_com["v_ae"] / _seg_com["total"] * 100).round(1)
+    _seg_com["segmento"] = pd.Categorical(_seg_com["segmento"], categories=_SEG_ORDER, ordered=True)
+    _seg_com = _seg_com.sort_values(["segmento","pct_ae"])
+
+    _seg_com_wide = _seg_com.pivot(index="comuna_label", columns="segmento", values="pct_ae").reset_index()
+    _seg_com_wide["pct_ae_total"] = _seg_com_wide[_SEG_ORDER].mean(axis=1)
+    _seg_com_wide = _seg_com_wide.sort_values("pct_ae_total", ascending=False)
+
+    _fig_com_et = go.Figure()
+    for _sg, _sc in _SEG_COLORS.items():
+        if _sg in _seg_com_wide.columns:
+            _fig_com_et.add_trace(go.Bar(
+                name=_sg,
+                x=_seg_com_wide["comuna_label"],
+                y=_seg_com_wide[_sg],
+                marker_color=_sc,
+                hovertemplate=f"<b>%{{x}}</b><br>{_sg}: %{{y:.1f}}%<extra></extra>",
+            ))
+    _fig_com_et.update_layout(
+        barmode="group", height=420,
+        margin=dict(l=0, r=0, t=10, b=0),
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#111111",
+        xaxis=dict(tickangle=-40, tickfont=dict(color="#9A9A90", size=9),
+                   gridcolor="rgba(0,0,0,0)"),
+        yaxis=dict(ticksuffix="%", gridcolor="#1E1E1E", tickfont=dict(color="#9A9A90")),
+        legend=dict(title="Grupo etario", orientation="h", yanchor="bottom", y=1.01,
+                    xanchor="left", x=0, font=dict(color="#9A9A90", size=11),
+                    bgcolor="rgba(0,0,0,0)"),
+    )
+    st.plotly_chart(_fig_com_et, use_container_width=True, config={"displayModeBar": False})
+
+    # Tabla resumen etario por comuna
+    _tbl_seg_com = _seg_com_wide[["comuna_label"] + _SEG_ORDER].rename(
+        columns={"comuna_label": "Comuna"}
+    ).reset_index(drop=True)
+    for _sg in _SEG_ORDER:
+        if _sg in _tbl_seg_com.columns:
+            _tbl_seg_com[_sg] = _tbl_seg_com[_sg].apply(
+                lambda v: f"{v:.1f}%" if pd.notna(v) else "—"
+            )
+    st.dataframe(_tbl_seg_com, use_container_width=True, hide_index=True)
+
 
 # ── Tab Área Metropolitana ────────────────────────────────────────────────────
 with t_amva:
