@@ -2511,8 +2511,17 @@ with t_medellin:
         "v_sergio_fajardo":           ("Fajardo",  "#ff7f0e"),
     }
 
+    # ── Procesar click del mapa (run anterior) antes de renderizar widgets ────
+    if "_med_map_click" in st.session_state:
+        _clicked_buf = st.session_state.pop("_med_map_click")
+        _cbuf_row = _med_p_all[_med_p_all["puesto"] == _clicked_buf]
+        if not _cbuf_row.empty:
+            _cbuf_com = _MED_COM_NAMES.get(int(_cbuf_row.iloc[0]["cod_comune"]), "— Todas —")
+            st.session_state["drill_com"]    = _cbuf_com
+            st.session_state["drill_puesto"] = _clicked_buf
+
     # ── Filtros: commune (overview) + commune+puesto (drill) ──────────────────
-    _flt1, _flt2, _flt3 = st.columns([1, 1, 2])
+    _flt1, _flt2, _flt3, _flt4 = st.columns([1, 1, 2, 0.6])
 
     _com_opts_all = ["Todas las comunas"] + [
         _MED_COM_NAMES[k]
@@ -2538,6 +2547,13 @@ with t_medellin:
     with _flt3:
         _d_sel_puesto = st.selectbox("Drill-down — puesto",
                                      _d_puesto_opts, key="drill_puesto")
+    with _flt4:
+        st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
+        if st.button("Limpiar filtros", key="med_clear"):
+            for _k in ["med_com_filter", "drill_com", "drill_puesto"]:
+                if _k in st.session_state:
+                    del st.session_state[_k]
+            st.rerun()
 
     # Datos para overview (filtro de mapa)
     if _sel_com == "Todas las comunas":
@@ -2606,6 +2622,7 @@ with t_medellin:
                 lon=_map_ae["lon"],
                 mode="markers",
                 name="Abelardo 1°",
+                customdata=_map_ae["puesto"].values,
                 marker=dict(
                     size=_map_ae["marker_size"],
                     color=_map_ae["pct_abelardo"],
@@ -2642,6 +2659,7 @@ with t_medellin:
                 lon=_map_ic["lon"],
                 mode="markers",
                 name="Cepeda 1°",
+                customdata=_map_ic["puesto"].values,
                 marker=dict(
                     size=_map_ic["marker_size"],
                     color="#CC0000",
@@ -2659,6 +2677,7 @@ with t_medellin:
                 lon=[_sel_row["lon"]],
                 mode="markers+text",
                 name="Seleccionado",
+                customdata=[_sel_row["puesto"]],
                 marker=dict(size=24, color="#C8A96E", opacity=1.0),
                 text=[_d_sel_puesto],
                 textposition="top center",
@@ -2695,8 +2714,22 @@ with t_medellin:
                 font=dict(color="#333333", size=11),
             ),
         )
-        st.plotly_chart(_fig_map, use_container_width=True,
-                        config={"scrollZoom": True, "displayModeBar": False})
+        _map_event = st.plotly_chart(
+            _fig_map, use_container_width=True,
+            on_select="rerun", selection_mode="points",
+            config={"scrollZoom": True, "displayModeBar": False},
+        )
+        # Capturar click → guardar en buffer y rerenderizar con filtro actualizado
+        if (
+            _map_event
+            and hasattr(_map_event, "selection")
+            and _map_event.selection.points
+        ):
+            _ev_pt = _map_event.selection.points[0]
+            _ev_puesto = _ev_pt.get("customdata")
+            if _ev_puesto and isinstance(_ev_puesto, str):
+                st.session_state["_med_map_click"] = _ev_puesto
+                st.rerun()
 
     with _col_bar:
         st.subheader("Puestos por % Abelardo")
@@ -2939,6 +2972,96 @@ with t_medellin:
             _tbl_full[_c] = _tbl_full[_c].apply(lambda v: f"{int(v):,}")
         st.dataframe(_tbl_full.reset_index(drop=True),
                      use_container_width=True, hide_index=True, height=400)
+
+    st.divider()
+
+    # ── Peor rendimiento de Abelardo ──────────────────────────────────────────
+    st.subheader("Puestos con peor rendimiento de Abelardo")
+
+    _perf_df = _med_p_all.copy()
+    _perf_df["v_ivan_cepeda_pct"] = (
+        _perf_df.get("v_ivan_cepeda", 0) / _perf_df["total_validos"] * 100
+    ).round(1)
+
+    # Los 25 puestos donde Cepeda ganó (semaforo amarillo/rojo)
+    _ic_wins = _perf_df[_perf_df["semaforo"] != "verde"].copy()
+    # Más los 15 verdes con menor % AE
+    _ae_low = _perf_df[_perf_df["semaforo"] == "verde"].nsmallest(15, "pct_abelardo").copy()
+    _worst = pd.concat([_ic_wins, _ae_low]).drop_duplicates("puesto").sort_values("pct_abelardo")
+
+    _pw1, _pw2 = st.columns([3, 2], gap="large")
+
+    with _pw1:
+        # Barras agrupadas: AE vs IC por puesto
+        _worst_sorted = _worst.sort_values("pct_abelardo")
+
+        _fig_pw = go.Figure()
+        _fig_pw.add_trace(go.Bar(
+            name="Abelardo",
+            y=_worst_sorted["puesto"],
+            x=_worst_sorted["pct_abelardo"],
+            orientation="h",
+            marker_color="#1f77b4",
+            text=_worst_sorted["pct_abelardo"].apply(lambda v: f"{v:.1f}%"),
+            textposition="outside",
+            textfont=dict(size=9, color="#9A9A90", family="IBM Plex Mono"),
+        ))
+        _fig_pw.add_trace(go.Bar(
+            name="Cepeda",
+            y=_worst_sorted["puesto"],
+            x=_worst_sorted["v_ivan_cepeda_pct"],
+            orientation="h",
+            marker_color="#CC0000",
+            text=_worst_sorted["v_ivan_cepeda_pct"].apply(lambda v: f"{v:.1f}%"),
+            textposition="outside",
+            textfont=dict(size=9, color="#9A9A90", family="IBM Plex Mono"),
+        ))
+        _fig_pw.update_layout(
+            barmode="group",
+            height=max(320, len(_worst_sorted) * 22),
+            margin=dict(l=0, r=70, t=10, b=0),
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="#111111",
+            xaxis=dict(
+                range=[0, 100], ticksuffix="%",
+                gridcolor="#1E1E1E", tickfont=dict(color="#9A9A90"),
+            ),
+            yaxis=dict(
+                gridcolor="rgba(0,0,0,0)",
+                tickfont=dict(color="#9A9A90", size=9),
+            ),
+            legend=dict(
+                orientation="h", yanchor="bottom", y=1.01,
+                xanchor="left", x=0,
+                font=dict(color="#9A9A90"), bgcolor="rgba(0,0,0,0)",
+            ),
+        )
+        st.plotly_chart(_fig_pw, use_container_width=True,
+                        config={"displayModeBar": False})
+
+    with _pw2:
+        st.markdown("##### Puestos donde Cepeda ganó")
+        if len(_ic_wins):
+            _ic_tbl = _ic_wins[[
+                "puesto", "comuna_label", "pct_abelardo",
+                "v_ivan_cepeda_pct", "total_validos",
+            ]].rename(columns={
+                "puesto":          "Puesto",
+                "comuna_label":    "Comuna",
+                "pct_abelardo":    "% AE",
+                "v_ivan_cepeda_pct": "% IC",
+                "total_validos":   "Válidos",
+            }).sort_values("% IC", ascending=False).reset_index(drop=True)
+            _ic_tbl["% AE"]   = _ic_tbl["% AE"].apply(lambda v: f"{v:.1f}%")
+            _ic_tbl["% IC"]   = _ic_tbl["% IC"].apply(lambda v: f"{v:.1f}%")
+            _ic_tbl["Válidos"] = _ic_tbl["Válidos"].apply(lambda v: f"{int(v):,}")
+            st.dataframe(_ic_tbl, use_container_width=True,
+                         hide_index=True, height=500)
+        else:
+            st.info("Abelardo ganó en todos los puestos del filtro actual.")
+
+        st.markdown(f"**{len(_ic_wins)}** puestos ganados por Cepeda · "
+                    f"**{len(_perf_df) - len(_ic_wins)}** por Abelardo")
 
 
 # ── Pie de página ─────────────────────────────────────────────────────────────
