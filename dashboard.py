@@ -2538,6 +2538,11 @@ with t_medellin:
                                   ["— Todas —"] + _com_opts_all[1:],
                                   key="drill_com")
 
+    # Resetear puesto a "sin seleccionar" cuando cambia la commune
+    if st.session_state.get("_last_drill_com") != _d_sel_com:
+        st.session_state["_last_drill_com"] = _d_sel_com
+        st.session_state["drill_puesto"] = "— Sin seleccionar —"
+
     if _d_sel_com == "— Todas —":
         _d_puestos_df = _med_p_all.copy()
         _d_mesas_pool = _med_m_all.copy()
@@ -2552,7 +2557,7 @@ with t_medellin:
     with _flt4:
         st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
         if st.button("Limpiar filtros", key="med_clear"):
-            for _k in ["med_com_filter", "drill_com", "drill_puesto"]:
+            for _k in ["med_com_filter", "drill_com", "drill_puesto", "_last_drill_com"]:
                 if _k in st.session_state:
                     del st.session_state[_k]
             st.rerun()
