@@ -633,6 +633,18 @@ def load_amva_data():
 _amva_p_all, _amva_m_all, _AMVA_MUNIS = load_amva_data()
 
 
+@st.cache_data
+def load_antioquia_data():
+    _p = pd.read_csv("resultados/antioquia_puestos.csv")
+    _m = pd.read_csv("resultados/antioquia_mesas.csv")
+    _p["cod_comune"] = _p["cod_comune"].fillna(0).astype(int)
+    _m["cod_comuna"] = _m["cod_comuna"].fillna(0).astype(int)
+    return _p, _m
+
+
+_ant_p_all, _ant_m_all = load_antioquia_data()
+
+
 # ── Tema oscuro editorial (fijo) ──────────────────────────────────────────────
 _PLOTLY_TPL = "plotly_dark"
 _GEO_LAND   = "rgba(40,40,40,0.7)"
@@ -744,14 +756,14 @@ def _reset_proyeccion() -> None:
 
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
-t_nacional, t_depts, t_antioquia, t_fuerza_ae, t_fuerza_paloma, t_coalicion, t_proyeccion, t_medellin, t_amva = st.tabs([
+t_nacional, t_depts, t_fuerza_ae, t_fuerza_paloma, t_coalicion, t_proyeccion, t_antioquia, t_medellin, t_amva = st.tabs([
     "Resultados Nacionales",
     "Por Departamento",
-    "Solo Antioquia",
     "Fuerza Abelardo",
     "Fuerza Paloma",
     "Análisis Coalición",
     "Proyección 2ª Vuelta",
+    "Antioquia",
     "Medellín",
     "Área Metropolitana",
 ])
@@ -2516,6 +2528,517 @@ with t_antioquia:
             "Dif AE-IC", "Ganador",
         ]
         st.dataframe(tabla_ant, use_container_width=True, hide_index=True)
+
+        # ── Análisis por puesto de votación ───────────────────────────────────
+        st.divider()
+        st.subheader("Análisis por puesto de votación – Antioquia")
+
+        _ANP_CANDS_4 = {
+            "v_abelardo_de_la_espriella": ("Abelardo", "#1f77b4"),
+            "v_ivan_cepeda":              ("Cepeda",   "#CC0000"),
+            "v_paloma_valencia":          ("Paloma",   "#2ca02c"),
+            "v_sergio_fajardo":           ("Fajardo",  "#ff7f0e"),
+        }
+
+        # Procesar click de mapa (run anterior)
+        if "_anp_map_click" in st.session_state:
+            _anp_clicked = st.session_state.pop("_anp_map_click")
+            _anp_cbuf = _ant_p_all[_ant_p_all["puesto"] == _anp_clicked]
+            if not _anp_cbuf.empty:
+                st.session_state["anp_drill_muni"]   = _anp_cbuf.iloc[0]["municipio"]
+                st.session_state["anp_drill_puesto"] = _anp_clicked
+
+        # Filtros
+        _anp_f1, _anp_f2, _anp_f3, _anp_f4 = st.columns([1, 1, 2, 0.6])
+
+        _anp_muni_opts = ["Todos los municipios"] + sorted(_ant_p_all["municipio"].unique().tolist())
+        with _anp_f1:
+            _anp_sel_muni = st.selectbox("Mapa — municipio", _anp_muni_opts, key="anp_mapa_muni")
+
+        _anp_drill_muni_opts = ["— Todos —"] + sorted(_ant_p_all["municipio"].unique().tolist())
+        with _anp_f2:
+            _anp_d_muni = st.selectbox("Drill-down — municipio", _anp_drill_muni_opts, key="anp_drill_muni")
+
+        if st.session_state.get("_anp_last_muni") != _anp_d_muni:
+            st.session_state["_anp_last_muni"]    = _anp_d_muni
+            st.session_state["anp_drill_puesto"]  = "— Sin seleccionar —"
+
+        if _anp_d_muni == "— Todos —":
+            _anp_d_p_df   = _ant_p_all.copy()
+            _anp_d_m_pool = _ant_m_all.copy()
+        else:
+            _anp_d_p_df   = _ant_p_all[_ant_p_all["municipio"] == _anp_d_muni].copy()
+            _anp_d_m_pool = _ant_m_all[_ant_m_all["municipio"] == _anp_d_muni].copy()
+
+        _anp_puesto_opts = ["— Sin seleccionar —"] + sorted(_anp_d_p_df["puesto"].unique().tolist())
+        with _anp_f3:
+            _anp_d_puesto = st.selectbox("Drill-down — puesto", _anp_puesto_opts, key="anp_drill_puesto")
+        with _anp_f4:
+            st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
+            if st.button("Limpiar filtros", key="anp_clear"):
+                for _k in ["anp_mapa_muni","anp_drill_muni","anp_drill_puesto","_anp_last_muni"]:
+                    if _k in st.session_state: del st.session_state[_k]
+                st.rerun()
+
+        # Datos para mapa
+        if _anp_sel_muni == "Todos los municipios":
+            _anp_fp = _ant_p_all.copy()
+        else:
+            _anp_fp = _ant_p_all[_ant_p_all["municipio"] == _anp_sel_muni].copy()
+
+        # Métricas
+        _anp_ae  = int(_anp_fp["votos_abelardo"].sum())
+        _anp_val = int(_anp_fp["total_validos"].sum())
+        _anp_pct = _anp_ae / _anp_val * 100 if _anp_val else 0
+        _anp_nm  = int(_anp_fp["n_mesas"].sum())
+        _anp_np  = len(_anp_fp)
+        _anp_vrd = (_anp_fp["semaforo"] == "verde").sum()
+
+        _anpc1,_anpc2,_anpc3,_anpc4,_anpc5 = st.columns(5)
+        _anpc1.metric("Votos Abelardo", f"{_anp_ae:,}")
+        _anpc2.metric("Votos válidos",  f"{_anp_val:,}")
+        _anpc3.metric("% Abelardo",     f"{_anp_pct:.1f}%")
+        _anpc4.metric("Puestos",        f"{_anp_np}",
+                      f"{_anp_vrd} 1° · {_anp_np-_anp_vrd} 2°+", delta_color="off")
+        _anpc5.metric("Mesas",          f"{_anp_nm:,}")
+
+        st.divider()
+
+        # Mapa + barra
+        _anp_cm, _anp_cb = st.columns([3, 2], gap="large")
+
+        with _anp_cm:
+            st.subheader("Mapa Antioquia — puestos")
+
+            _anp_map = _anp_fp.dropna(subset=["lat","lon"]).copy()
+            _anp_maxv = _anp_map["total_validos"].max() or 1
+            _anp_map["msize"] = (_anp_map["total_validos"] / _anp_maxv * 16 + 5).clip(5, 22)
+
+            _anp_map_ae  = _anp_map[_anp_map["semaforo"] == "verde"].copy()
+            _anp_map_ic  = _anp_map[_anp_map["semaforo"] != "verde"].copy()
+            _anp_map_sel = (
+                _anp_map[_anp_map["puesto"] == _anp_d_puesto].copy()
+                if _anp_d_puesto != "— Sin seleccionar —" else pd.DataFrame()
+            )
+
+            def _anp_htxt(r):
+                return (f"<b>{r['puesto']}</b><br>"
+                        f"Municipio: {r['municipio']}<br>"
+                        f"Abelardo: <b>{r['pct_abelardo']:.1f}%</b> · {int(r['votos_abelardo']):,}<br>"
+                        f"Válidos: {int(r['total_validos']):,}")
+
+            _anp_map["_ht"] = _anp_map.apply(_anp_htxt, axis=1)
+
+            _fig_anpm = go.Figure()
+
+            if len(_anp_map_ae):
+                _anp_map_ae["_ht"] = _anp_map_ae.apply(_anp_htxt, axis=1)
+                _fig_anpm.add_trace(go.Scattermapbox(
+                    lat=_anp_map_ae["lat"], lon=_anp_map_ae["lon"],
+                    mode="markers", name="Abelardo 1°",
+                    customdata=_anp_map_ae["puesto"].values,
+                    marker=dict(
+                        size=_anp_map_ae["msize"],
+                        color=_anp_map_ae["pct_abelardo"],
+                        colorscale=[[0,"#a8d4f5"],[0.5,"#4A90C0"],[1,"#003880"]],
+                        cmin=40, cmax=82, showscale=True,
+                        colorbar=dict(title="% AE", x=1.0, thickness=12, len=0.5,
+                                      tickfont=dict(color="#444",size=10),
+                                      title_font=dict(color="#444"), ticksuffix="%"),
+                        opacity=0.88,
+                    ),
+                    text=_anp_map_ae["_ht"], hoverinfo="text",
+                ))
+
+            if len(_anp_map_ic):
+                _anp_map_ic["_ht_ic"] = _anp_map_ic.apply(
+                    lambda r: (f"<b>{r['puesto']}</b><br>{r['municipio']}<br>"
+                               f"AE 2° — {r['pct_abelardo']:.1f}%<br>"
+                               f"Válidos: {int(r['total_validos']):,}"), axis=1)
+                _fig_anpm.add_trace(go.Scattermapbox(
+                    lat=_anp_map_ic["lat"], lon=_anp_map_ic["lon"],
+                    mode="markers", name="Cepeda 1°",
+                    customdata=_anp_map_ic["puesto"].values,
+                    marker=dict(size=_anp_map_ic["msize"], color="#CC0000", opacity=0.88),
+                    text=_anp_map_ic["_ht_ic"], hoverinfo="text",
+                ))
+
+            if len(_anp_map_sel):
+                _anps = _anp_map_sel.iloc[0]
+                _fig_anpm.add_trace(go.Scattermapbox(
+                    lat=[_anps["lat"]], lon=[_anps["lon"]],
+                    mode="markers+text", name="Seleccionado",
+                    customdata=[_anps["puesto"]],
+                    marker=dict(size=26, color="#C8A96E", opacity=1.0),
+                    text=[_anp_d_puesto], textposition="top center",
+                    textfont=dict(size=11, color="#C8A96E"),
+                    hovertext=(f"<b>★ {_anps['puesto']}</b><br>{_anps['municipio']}<br>"
+                               f"Abelardo: {_anps['pct_abelardo']:.1f}%"),
+                    hoverinfo="text",
+                ))
+                _anpm_center = {"lat": _anps["lat"], "lon": _anps["lon"]}
+                _anpm_zoom   = 14
+            else:
+                _anpm_center = {"lat": 6.70, "lon": -75.50}
+                _anpm_zoom   = 7
+
+            _fig_anpm.update_layout(
+                mapbox=dict(style="carto-positron", zoom=_anpm_zoom, center=_anpm_center),
+                height=540,
+                margin=dict(l=0,r=0,t=0,b=0),
+                paper_bgcolor="rgba(0,0,0,0)",
+                legend=dict(orientation="h", yanchor="bottom", y=0.02, xanchor="left", x=0.02,
+                            bgcolor="rgba(255,255,255,0.85)", bordercolor="#ccc", borderwidth=1,
+                            font=dict(color="#333",size=11)),
+            )
+            _anp_mev = st.plotly_chart(
+                _fig_anpm, use_container_width=True,
+                on_select="rerun", selection_mode="points",
+                config={"scrollZoom": True, "displayModeBar": False},
+            )
+            if (_anp_mev and hasattr(_anp_mev,"selection")
+                    and _anp_mev.selection.points):
+                _anp_pt = _anp_mev.selection.points[0]
+                _anp_cp = _anp_pt.get("customdata")
+                if _anp_cp and isinstance(_anp_cp, str):
+                    st.session_state["_anp_map_click"] = _anp_cp
+                    st.rerun()
+
+        with _anp_cb:
+            st.subheader("Puestos por % Abelardo")
+            _anp_bar = _anp_fp.copy().sort_values("pct_abelardo", ascending=True)
+            _anp_bar["color"] = _anp_bar.apply(
+                lambda r: "#C8A96E" if r["puesto"] == _anp_d_puesto
+                          else ("#CC0000" if r["semaforo"] != "verde" else "#1f77b4"), axis=1)
+            if len(_anp_bar) > 50:
+                _anp_bar = pd.concat([_anp_bar.head(25), _anp_bar.tail(25)])
+            _fig_anpb = go.Figure(go.Bar(
+                y=_anp_bar["puesto"], x=_anp_bar["pct_abelardo"], orientation="h",
+                marker_color=_anp_bar["color"],
+                text=_anp_bar.apply(lambda r: f"{r['municipio'][:4]}· {r['pct_abelardo']:.1f}%", axis=1),
+                textposition="outside",
+                textfont=dict(size=9, color="#9A9A90", family="IBM Plex Mono"),
+                customdata=_anp_bar[["votos_abelardo","total_validos","municipio"]].values,
+                hovertemplate=("<b>%{y}</b><br>%{customdata[2]}<br>"
+                               "AE: <b>%{x:.1f}%</b><br>"
+                               "Votos: %{customdata[0]:,} · Válidos: %{customdata[1]:,}<extra></extra>"),
+            ))
+            _fig_anpb.update_layout(
+                height=540, margin=dict(l=0,r=80,t=10,b=10),
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#111111",
+                xaxis=dict(range=[0,100], ticksuffix="%", gridcolor="#1E1E1E",
+                           tickfont=dict(color="#9A9A90")),
+                yaxis=dict(gridcolor="rgba(0,0,0,0)", tickfont=dict(color="#9A9A90",size=8)),
+                showlegend=False,
+            )
+            st.plotly_chart(_fig_anpb, use_container_width=True, config={"displayModeBar": False})
+
+        st.divider()
+
+        # Drill-down mesa a mesa
+        st.subheader("Análisis mesa a mesa")
+
+        if _anp_d_puesto == "— Sin seleccionar —":
+            st.info("Selecciona un puesto en el selector o haz clic en el mapa.")
+        else:
+            _anp_dm = _anp_d_m_pool[_anp_d_m_pool["puesto"] == _anp_d_puesto].sort_values("mesa").copy()
+            _anp_dmv = _anp_dm[_anp_dm["total_validos"] > 0].copy()
+
+            if _anp_dmv.empty:
+                st.info("No hay mesas con datos para este puesto.")
+            else:
+                _anp_ae_p  = int(_anp_dmv["v_abelardo_de_la_espriella"].sum())
+                _anp_ic_p  = int(_anp_dmv["v_ivan_cepeda"].sum())
+                _anp_pal_p = int(_anp_dmv["v_paloma_valencia"].sum())
+                _anp_faj_p = int(_anp_dmv["v_sergio_fajardo"].sum())
+                _anp_val_p = int(_anp_dmv["total_validos"].sum())
+                _anp_nm_p  = len(_anp_dmv)
+
+                _anpd1,_anpd2,_anpd3,_anpd4,_anpd5,_anpd6 = st.columns(6)
+                _anpd1.metric("Abelardo", f"{_anp_ae_p:,}",
+                              f"{_anp_ae_p/_anp_val_p*100:.1f}%", delta_color="off")
+                _anpd2.metric("Cepeda",   f"{_anp_ic_p:,}",
+                              f"{_anp_ic_p/_anp_val_p*100:.1f}%", delta_color="off")
+                _anpd3.metric("Paloma",   f"{_anp_pal_p:,}",
+                              f"{_anp_pal_p/_anp_val_p*100:.1f}%", delta_color="off")
+                _anpd4.metric("Fajardo",  f"{_anp_faj_p:,}",
+                              f"{_anp_faj_p/_anp_val_p*100:.1f}%", delta_color="off")
+                _anpd5.metric("Válidos",  f"{_anp_val_p:,}")
+                _anpd6.metric("Mesas",    str(_anp_nm_p))
+
+                _anp_mlabels = [f"Mesa {int(r)}" for r in _anp_dmv["mesa"]]
+
+                # Barras apiladas %
+                _fig_anps = go.Figure()
+                for _col,(_lbl,_clr) in _ANP_CANDS_4.items():
+                    _vals = _anp_dmv[_col].values
+                    _pcts = (_vals / _anp_dmv["total_validos"].values * 100).round(1)
+                    _fig_anps.add_trace(go.Bar(
+                        name=_lbl, x=_anp_mlabels, y=_pcts,
+                        marker_color=_clr,
+                        text=[f"{v:.0f}%" for v in _pcts],
+                        textposition="inside", insidetextanchor="middle",
+                        textfont=dict(size=9,color="#FFFFFF",family="IBM Plex Mono"),
+                        customdata=_vals,
+                        hovertemplate=(f"<b>{_lbl}</b><br>%{{y:.1f}}% · %{{customdata:,}}<extra></extra>"),
+                    ))
+                _anp_otros_v = (_anp_dmv["total_validos"].values
+                                - sum(_anp_dmv[c].values for c in _ANP_CANDS_4))
+                _anp_otros_p = (_anp_otros_v / _anp_dmv["total_validos"].values * 100).round(1)
+                _fig_anps.add_trace(go.Bar(
+                    name="Otros", x=_anp_mlabels, y=_anp_otros_p,
+                    marker_color="#555555", text=None,
+                    hovertemplate="<b>Otros</b><br>%{y:.1f}%<extra></extra>",
+                ))
+                _fig_anps.update_layout(
+                    barmode="stack", height=360,
+                    margin=dict(l=0,r=0,t=10,b=0),
+                    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#111111",
+                    xaxis=dict(tickfont=dict(color="#9A9A90",size=10), gridcolor="rgba(0,0,0,0)"),
+                    yaxis=dict(ticksuffix="%", range=[0,100], gridcolor="#1E1E1E",
+                               tickfont=dict(color="#9A9A90")),
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0,
+                                font=dict(color="#9A9A90",size=11), bgcolor="rgba(0,0,0,0)"),
+                )
+                st.plotly_chart(_fig_anps, use_container_width=True, config={"displayModeBar": False})
+
+                # Líneas comparativas
+                _fig_anpl = go.Figure()
+                for _col,(_lbl,_clr) in _ANP_CANDS_4.items():
+                    _pcts = (_anp_dmv[_col].values / _anp_dmv["total_validos"].values * 100).round(1)
+                    _fig_anpl.add_trace(go.Scatter(
+                        x=_anp_mlabels, y=_pcts, mode="lines+markers", name=_lbl,
+                        line=dict(color=_clr,width=2.5), marker=dict(size=8,color=_clr),
+                        hovertemplate=f"<b>{_lbl}</b> · %{{y:.1f}}<extra></extra>",
+                    ))
+                _anp_avg_ae = (_anp_dmv["v_abelardo_de_la_espriella"].sum()
+                               / _anp_dmv["total_validos"].sum() * 100)
+                _fig_anpl.add_hline(y=_anp_avg_ae, line_dash="dot", line_color="#1f77b4",
+                                    line_width=1,
+                                    annotation_text=f"AE prom. {_anp_avg_ae:.1f}%",
+                                    annotation_font=dict(color="#1f77b4",size=10),
+                                    annotation_position="right")
+                _fig_anpl.update_layout(
+                    height=300, margin=dict(l=0,r=80,t=10,b=0),
+                    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#111111",
+                    xaxis=dict(tickfont=dict(color="#9A9A90",size=10), gridcolor="#1E1E1E"),
+                    yaxis=dict(ticksuffix="%", gridcolor="#1E1E1E", tickfont=dict(color="#9A9A90")),
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0,
+                                font=dict(color="#9A9A90",size=11), bgcolor="rgba(0,0,0,0)"),
+                )
+                st.plotly_chart(_fig_anpl, use_container_width=True, config={"displayModeBar": False})
+
+                st.divider()
+
+                # Top / Bottom mesas
+                _anp_rcols = ["mesa","votos_abelardo","v_ivan_cepeda",
+                              "v_paloma_valencia","v_sergio_fajardo",
+                              "total_validos","pct_abelardo","semaforo"]
+                _anp_rren  = {"mesa":"Mesa","votos_abelardo":"Abelardo","v_ivan_cepeda":"Cepeda",
+                              "v_paloma_valencia":"Paloma","v_sergio_fajardo":"Fajardo",
+                              "total_validos":"Válidos","pct_abelardo":"% AE","semaforo":"Pos."}
+
+                def _anp_fmt(df_in):
+                    _anp_dmv2 = df_in.copy()
+                    _anp_dmv2["semaforo"] = _anp_dmv2["semaforo"].map(
+                        {"verde":"1°","amarillo":"2°","rojo":"3°+"}).fillna("?")
+                    df_o = _anp_dmv2[_anp_rcols].rename(columns=_anp_rren).reset_index(drop=True)
+                    df_o["% AE"] = df_o["% AE"].apply(lambda v: f"{v:.1f}%")
+                    for _c in ["Abelardo","Cepeda","Paloma","Fajardo","Válidos"]:
+                        df_o[_c] = df_o[_c].apply(lambda v: f"{int(v):,}")
+                    return df_o
+
+                _anp_tl, _anp_tr = st.columns(2)
+                with _anp_tl:
+                    st.markdown("##### Mayor % Abelardo")
+                    st.dataframe(_anp_fmt(_anp_dmv.nlargest(10,"pct_abelardo")),
+                                 use_container_width=True, hide_index=True)
+                with _anp_tr:
+                    st.markdown("##### Menor % Abelardo")
+                    st.dataframe(_anp_fmt(_anp_dmv.nsmallest(10,"pct_abelardo")),
+                                 use_container_width=True, hide_index=True)
+
+        st.divider()
+
+        # Comparativo por municipio
+        st.subheader("Comparativo por municipio – Antioquia")
+
+        _anp_muni_sum = (
+            _ant_p_all.groupby("municipio")
+            .agg(
+                puestos=("puesto","count"),
+                mesas=("n_mesas","sum"),
+                votos_ae=("votos_abelardo","sum"),
+                total_val=("total_validos","sum"),
+                v_ic=("v_ivan_cepeda","sum"),
+                v_paloma=("v_paloma_valencia","sum"),
+                v_fajardo=("v_sergio_fajardo","sum"),
+            ).reset_index()
+        )
+        _anp_muni_sum["pct_ae"]      = (_anp_muni_sum["votos_ae"]  / _anp_muni_sum["total_val"] * 100).round(1)
+        _anp_muni_sum["pct_ic"]      = (_anp_muni_sum["v_ic"]      / _anp_muni_sum["total_val"] * 100).round(1)
+        _anp_muni_sum["pct_paloma"]  = (_anp_muni_sum["v_paloma"]  / _anp_muni_sum["total_val"] * 100).round(1)
+        _anp_muni_sum["pct_fajardo"] = (_anp_muni_sum["v_fajardo"] / _anp_muni_sum["total_val"] * 100).round(1)
+        _anp_muni_sum["pot_ambos"]   = (
+            (_anp_muni_sum["votos_ae"] + _anp_muni_sum["v_paloma"] + _anp_muni_sum["v_fajardo"])
+            / _anp_muni_sum["total_val"] * 100
+        ).round(1)
+        _anp_muni_sum = _anp_muni_sum.sort_values("pct_ae", ascending=False)
+
+        _anp_tbl = _anp_muni_sum[[
+            "municipio","puestos","mesas","total_val",
+            "pct_ae","pct_ic","pct_paloma","pct_fajardo","pot_ambos"
+        ]].rename(columns={
+            "municipio":"Municipio","puestos":"Puestos","mesas":"Mesas",
+            "total_val":"Válidos","pct_ae":"% AE","pct_ic":"% IC",
+            "pct_paloma":"% Paloma","pct_fajardo":"% Fajardo","pot_ambos":"AE+Ambos",
+        }).reset_index(drop=True)
+        for _c in ["% AE","% IC","% Paloma","% Fajardo","AE+Ambos"]:
+            _anp_tbl[_c] = _anp_tbl[_c].apply(lambda v: f"{v:.1f}%")
+        _anp_tbl["Válidos"] = _anp_tbl["Válidos"].apply(lambda v: f"{int(v):,}")
+        _anp_tbl["Mesas"]   = _anp_tbl["Mesas"].apply(lambda v: f"{int(v):,}")
+        st.dataframe(_anp_tbl, use_container_width=True, hide_index=True)
+
+        st.divider()
+
+        # Peor rendimiento Antioquia
+        st.subheader("Puestos con peor rendimiento de Abelardo – Antioquia")
+
+        _anpperf = _ant_p_all.copy()
+        _anpperf["pct_ic"]      = (_anpperf["v_ivan_cepeda"]     / _anpperf["total_validos"] * 100).round(1)
+        _anpperf["dif_ic_ae"]   = (_anpperf["pct_ic"] - _anpperf["pct_abelardo"]).round(1)
+        _anpperf["pct_paloma"]  = (_anpperf["v_paloma_valencia"]  / _anpperf["total_validos"] * 100).round(1)
+        _anpperf["pct_fajardo"] = (_anpperf["v_sergio_fajardo"]   / _anpperf["total_validos"] * 100).round(1)
+        _anpperf["pot_ambos"]   = (
+            (_anpperf["votos_abelardo"] + _anpperf["v_paloma_valencia"] + _anpperf["v_sergio_fajardo"])
+            / _anpperf["total_validos"] * 100
+        ).round(1)
+
+        _anpic_wins = _anpperf[_anpperf["semaforo"] != "verde"].copy()
+        _anpae_low  = _anpperf[_anpperf["semaforo"] == "verde"].nsmallest(30, "pct_abelardo").copy()
+        _anpworst   = pd.concat([_anpic_wins, _anpae_low]).drop_duplicates("puesto").sort_values("pct_abelardo")
+
+        _anppw1, _anppw2 = st.columns([3, 2], gap="large")
+
+        with _anppw1:
+            _anpws = _anpworst.sort_values("pct_abelardo")
+            _fig_anppw = go.Figure()
+            _fig_anppw.add_trace(go.Bar(
+                name="Abelardo", y=_anpws["puesto"], x=_anpws["pct_abelardo"], orientation="h",
+                marker_color="#1f77b4",
+                text=_anpws.apply(lambda r: f"{r['municipio'][:4]}· {r['pct_abelardo']:.1f}%", axis=1),
+                textposition="outside",
+                textfont=dict(size=9, color="#9A9A90", family="IBM Plex Mono"),
+            ))
+            _fig_anppw.add_trace(go.Bar(
+                name="Cepeda", y=_anpws["puesto"], x=_anpws["pct_ic"], orientation="h",
+                marker_color="#CC0000", text=None,
+            ))
+            _fig_anppw.update_layout(
+                barmode="group", height=max(400, len(_anpws)*18),
+                margin=dict(l=0,r=70,t=10,b=0),
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#111111",
+                xaxis=dict(range=[0,100], ticksuffix="%", gridcolor="#1E1E1E",
+                           tickfont=dict(color="#9A9A90")),
+                yaxis=dict(gridcolor="rgba(0,0,0,0)", tickfont=dict(color="#9A9A90",size=8)),
+                legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="left", x=0,
+                            font=dict(color="#9A9A90",size=11), bgcolor="rgba(0,0,0,0)"),
+            )
+            st.plotly_chart(_fig_anppw, use_container_width=True, config={"displayModeBar": False})
+
+        with _anppw2:
+            st.markdown("##### Puestos donde Cepeda ganó")
+            if len(_anpic_wins):
+                _anpic_t = _anpic_wins[[
+                    "puesto","municipio","pct_abelardo","pct_ic",
+                    "dif_ic_ae","pct_paloma","pct_fajardo","pot_ambos","total_validos",
+                ]].rename(columns={
+                    "puesto":"Puesto","municipio":"Municipio",
+                    "pct_abelardo":"% AE","pct_ic":"% IC","dif_ic_ae":"Dif IC–AE",
+                    "pct_paloma":"% Paloma","pct_fajardo":"% Fajardo",
+                    "pot_ambos":"AE+Ambos","total_validos":"Válidos",
+                }).sort_values("Dif IC–AE", ascending=False).reset_index(drop=True)
+                for _c in ["% AE","% IC","% Paloma","% Fajardo","AE+Ambos"]:
+                    _anpic_t[_c] = _anpic_t[_c].apply(lambda v: f"{v:.1f}%")
+                _anpic_t["Dif IC–AE"] = _anpic_t["Dif IC–AE"].apply(lambda v: f"+{v:.1f}pp")
+                _anpic_t["Válidos"]   = _anpic_t["Válidos"].apply(lambda v: f"{int(v):,}")
+                st.dataframe(_anpic_t, use_container_width=True, hide_index=True, height=520)
+                st.caption("AE+Ambos: % si Abelardo recibe el 100% de Paloma + Fajardo")
+            else:
+                st.info("Abelardo ganó en todos los puestos.")
+            st.markdown(f"**{len(_anpic_wins)}** puestos ganados por Cepeda · "
+                        f"**{len(_anpperf)-len(_anpic_wins)}** por Abelardo")
+
+        st.divider()
+
+        # Mejores puestos Paloma y Fajardo – Antioquia
+        st.subheader("Mejores puestos — Paloma Valencia y Sergio Fajardo")
+
+        _anppf1, _anppf2 = st.columns(2, gap="large")
+
+        def _anp_top_bar(df_src, pct_col, label, color, n=20):
+            _df = df_src.nlargest(n, pct_col)[
+                ["puesto","municipio", pct_col,"pct_abelardo","pct_ic","pot_ambos","total_validos"]
+            ].copy()
+            _fig = go.Figure()
+            _fig.add_trace(go.Bar(
+                y=_df["puesto"], x=_df[pct_col], orientation="h",
+                name=label, marker_color=color,
+                text=_df.apply(lambda r: f"{r['municipio'][:4]}· {r[pct_col]:.1f}%", axis=1),
+                textposition="outside",
+                textfont=dict(size=9, color="#9A9A90", family="IBM Plex Mono"),
+                customdata=_df[["pct_abelardo","pct_ic","pot_ambos","total_validos","municipio"]].values,
+                hovertemplate=(
+                    "<b>%{y}</b> · %{customdata[4]}<br>"
+                    f"{label}: <b>%{{x:.1f}}%</b><br>"
+                    "AE: %{customdata[0]:.1f}% · IC: %{customdata[1]:.1f}%<br>"
+                    "AE+Ambos: %{customdata[2]:.1f}%<extra></extra>"
+                ),
+            ))
+            _fig.add_trace(go.Bar(
+                y=_df["puesto"], x=_df["pct_abelardo"], orientation="h",
+                name="Abelardo", marker_color="#1f77b4", opacity=0.5,
+                text=None, hoverinfo="skip",
+            ))
+            _fig.update_layout(
+                barmode="overlay", height=max(300, n*22),
+                margin=dict(l=0,r=65,t=10,b=0),
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#111111",
+                xaxis=dict(range=[0,60], ticksuffix="%", gridcolor="#1E1E1E",
+                           tickfont=dict(color="#9A9A90")),
+                yaxis=dict(gridcolor="rgba(0,0,0,0)", tickfont=dict(color="#9A9A90",size=9)),
+                legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="left", x=0,
+                            font=dict(color="#9A9A90",size=11), bgcolor="rgba(0,0,0,0)"),
+            )
+            return _fig, _df
+
+        with _anppf1:
+            st.markdown("##### Paloma Valencia — top 20")
+            _fig_anppal, _df_anppal = _anp_top_bar(_anpperf, "pct_paloma", "Paloma", "#2ca02c")
+            st.plotly_chart(_fig_anppal, use_container_width=True, config={"displayModeBar": False})
+            _t_anppal = _df_anppal[["puesto","municipio","pct_paloma","pct_abelardo",
+                                    "pct_ic","pot_ambos","total_validos"]].rename(columns={
+                "puesto":"Puesto","municipio":"Municipio","pct_paloma":"% Paloma",
+                "pct_abelardo":"% AE","pct_ic":"% IC","pot_ambos":"AE+Ambos","total_validos":"Válidos"
+            }).reset_index(drop=True)
+            for _c in ["% Paloma","% AE","% IC","AE+Ambos"]:
+                _t_anppal[_c] = _t_anppal[_c].apply(lambda v: f"{v:.1f}%")
+            _t_anppal["Válidos"] = _t_anppal["Válidos"].apply(lambda v: f"{int(v):,}")
+            st.dataframe(_t_anppal, use_container_width=True, hide_index=True)
+
+        with _anppf2:
+            st.markdown("##### Sergio Fajardo — top 20")
+            _fig_anpfaj, _df_anpfaj = _anp_top_bar(_anpperf, "pct_fajardo", "Fajardo", "#ff7f0e")
+            st.plotly_chart(_fig_anpfaj, use_container_width=True, config={"displayModeBar": False})
+            _t_anpfaj = _df_anpfaj[["puesto","municipio","pct_fajardo","pct_abelardo",
+                                    "pct_ic","pot_ambos","total_validos"]].rename(columns={
+                "puesto":"Puesto","municipio":"Municipio","pct_fajardo":"% Fajardo",
+                "pct_abelardo":"% AE","pct_ic":"% IC","pot_ambos":"AE+Ambos","total_validos":"Válidos"
+            }).reset_index(drop=True)
+            for _c in ["% Fajardo","% AE","% IC","AE+Ambos"]:
+                _t_anpfaj[_c] = _t_anpfaj[_c].apply(lambda v: f"{v:.1f}%")
+            _t_anpfaj["Válidos"] = _t_anpfaj["Válidos"].apply(lambda v: f"{int(v):,}")
+            st.dataframe(_t_anpfaj, use_container_width=True, hide_index=True)
 
 # ── Tab Medellín ──────────────────────────────────────────────────────────────
 with t_medellin:
