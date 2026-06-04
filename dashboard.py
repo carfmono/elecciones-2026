@@ -2504,18 +2504,42 @@ with t_antioquia:
 with t_medellin:
     st.header("Medellín – Análisis por puesto y mesa")
 
-    # ── Filtro de comuna ──────────────────────────────────────────────────────
-    _com_opts = ["Todas las comunas"] + [
+    _CANDS_4 = {
+        "v_abelardo_de_la_espriella": ("Abelardo", "#1f77b4"),
+        "v_ivan_cepeda":              ("Cepeda",   "#CC0000"),
+        "v_paloma_valencia":          ("Paloma",   "#2ca02c"),
+        "v_sergio_fajardo":           ("Fajardo",  "#ff7f0e"),
+    }
+
+    # ── Filtros: commune (overview) + commune+puesto (drill) ──────────────────
+    _flt1, _flt2, _flt3 = st.columns([1, 1, 2])
+
+    _com_opts_all = ["Todas las comunas"] + [
         _MED_COM_NAMES[k]
         for k in sorted(_MED_COM_NAMES.keys())
         if k in _med_p_all["cod_comune"].values
     ]
-    _sel_com = st.selectbox(
-        "Filtrar por comuna / corregimiento",
-        _com_opts,
-        key="med_com_filter",
-    )
+    with _flt1:
+        _sel_com = st.selectbox("Mapa — filtrar por comuna",
+                                _com_opts_all, key="med_com_filter")
+    with _flt2:
+        _d_sel_com = st.selectbox("Drill-down — comuna",
+                                  ["— Todas —"] + _com_opts_all[1:],
+                                  key="drill_com")
 
+    if _d_sel_com == "— Todas —":
+        _d_puestos_df = _med_p_all.copy()
+        _d_mesas_pool = _med_m_all.copy()
+    else:
+        _d_puestos_df = _med_p_all[_med_p_all["comuna_label"] == _d_sel_com].copy()
+        _d_mesas_pool = _med_m_all[_med_m_all["comuna_label"] == _d_sel_com].copy()
+
+    _d_puesto_opts = sorted(_d_puestos_df["puesto"].unique().tolist())
+    with _flt3:
+        _d_sel_puesto = st.selectbox("Drill-down — puesto",
+                                     _d_puesto_opts, key="drill_puesto")
+
+    # Datos para overview (filtro de mapa)
     if _sel_com == "Todas las comunas":
         _fp = _med_p_all.copy()
         _fm = _med_m_all.copy()
@@ -2536,8 +2560,8 @@ with t_medellin:
     _mc1.metric("Votos Abelardo",  f"{_tot_ae:,}")
     _mc2.metric("Votos válidos",   f"{_tot_val:,}")
     _mc3.metric("% Abelardo",      f"{_pct_ae:.1f}%")
-    _mc4.metric("Puestos",         f"{_n_puestos}", f"{_puestos_verde} 1° · {_puestos_amarillo} 2°",
-                delta_color="off")
+    _mc4.metric("Puestos",         f"{_n_puestos}",
+                f"{_puestos_verde} 1° · {_puestos_amarillo} 2°", delta_color="off")
     _mc5.metric("Mesas escrutadas", f"{_n_mesas:,}")
 
     st.divider()
@@ -2549,61 +2573,126 @@ with t_medellin:
         st.subheader("Mapa de puestos")
 
         _map_df = _fp.dropna(subset=["lat", "lon"]).copy()
-        _map_df["pct_fmt"] = _map_df["pct_abelardo"].apply(lambda v: f"{v:.1f}%")
-        _map_df["votos_fmt"] = _map_df["votos_abelardo"].apply(lambda v: f"{v:,}")
-        _map_df["validos_fmt"] = _map_df["total_validos"].apply(lambda v: f"{v:,}")
-        _map_df["sem_icon"] = _map_df["semaforo"].map(
-            {"verde": "🟢 1°", "amarillo": "🟡 2°", "rojo": "🔴 3°+", "gris": "⚪"}
-        ).fillna("⚪")
 
-        # Color: gradiente de bajo (rojo IC) a alto (azul AE)
-        _fig_map = px.scatter_mapbox(
-            _map_df,
-            lat="lat", lon="lon",
-            color="pct_abelardo",
-            size="total_validos",
-            size_max=22,
-            hover_name="puesto",
-            hover_data={
-                "pct_fmt":      True,
-                "votos_fmt":    True,
-                "validos_fmt":  True,
-                "sem_icon":     True,
-                "comuna_label": True,
-                "pct_abelardo": False,
-                "total_validos":False,
-                "lat":          False,
-                "lon":          False,
-            },
-            labels={
-                "pct_fmt":      "% Abelardo",
-                "votos_fmt":    "Votos Abelardo",
-                "validos_fmt":  "Válidos",
-                "sem_icon":     "Posición",
-                "comuna_label": "Comuna",
-            },
-            color_continuous_scale=[
-                [0.0,  "#CC0000"],
-                [0.35, "#CC6600"],
-                [0.50, "#C8A96E"],
-                [0.65, "#4A90C0"],
-                [1.0,  "#1f77b4"],
-            ],
-            range_color=[30, 85],
-            mapbox_style="carto-positron",
-            zoom=11,
-            center={"lat": 6.244, "lon": -75.581},
+        # Calcular tamaño de marcador (proporcional a votos, limitado)
+        _max_val = _map_df["total_validos"].max() if len(_map_df) else 1
+        _map_df["marker_size"] = (
+            (_map_df["total_validos"] / _max_val * 16 + 6).clip(6, 22)
         )
+
+        def _hover(row):
+            return (
+                f"<b>{row['puesto']}</b><br>"
+                f"Abelardo: <b>{row['pct_abelardo']:.1f}%</b> · {int(row['votos_abelardo']):,} votos<br>"
+                f"Válidos: {int(row['total_validos']):,}<br>"
+                f"Comuna: {row['comuna_label']}"
+            )
+
+        _map_df["_hover"] = _map_df.apply(_hover, axis=1)
+
+        # Separar AE-ganó (verde) vs otros (amarillo/rojo → Cepeda gana)
+        _map_ae  = _map_df[_map_df["semaforo"] == "verde"].copy()
+        _map_ic  = _map_df[_map_df["semaforo"] != "verde"].copy()
+
+        # Puesto seleccionado para highlight
+        _map_sel = _map_df[_map_df["puesto"] == _d_sel_puesto].copy()
+
+        _fig_map = go.Figure()
+
+        # Trace 1: Abelardo gana → gradiente azul (claro → oscuro por % AE)
+        if len(_map_ae):
+            _fig_map.add_trace(go.Scattermapbox(
+                lat=_map_ae["lat"],
+                lon=_map_ae["lon"],
+                mode="markers",
+                name="Abelardo 1°",
+                marker=dict(
+                    size=_map_ae["marker_size"],
+                    color=_map_ae["pct_abelardo"],
+                    colorscale=[[0, "#a8d4f5"], [0.5, "#4A90C0"], [1, "#003880"]],
+                    cmin=40, cmax=82,
+                    showscale=True,
+                    colorbar=dict(
+                        title="% AE",
+                        x=1.0,
+                        thickness=12,
+                        len=0.55,
+                        tickfont=dict(color="#444", size=10),
+                        title_font=dict(color="#444"),
+                        ticksuffix="%",
+                    ),
+                    opacity=0.88,
+                ),
+                text=_map_ae["_hover"],
+                hoverinfo="text",
+            ))
+
+        # Trace 2: Cepeda/otros ganan → rojo
+        if len(_map_ic):
+            _map_ic["_hover_ic"] = _map_ic.apply(
+                lambda r: (
+                    f"<b>{r['puesto']}</b><br>"
+                    f"⚠ Abelardo 2° — {r['pct_abelardo']:.1f}%<br>"
+                    f"Válidos: {int(r['total_validos']):,}<br>"
+                    f"Comuna: {r['comuna_label']}"
+                ), axis=1
+            )
+            _fig_map.add_trace(go.Scattermapbox(
+                lat=_map_ic["lat"],
+                lon=_map_ic["lon"],
+                mode="markers",
+                name="Cepeda 1°",
+                marker=dict(
+                    size=_map_ic["marker_size"],
+                    color="#CC0000",
+                    opacity=0.88,
+                ),
+                text=_map_ic["_hover_ic"],
+                hoverinfo="text",
+            ))
+
+        # Trace 3: puesto seleccionado → anillo dorado
+        if len(_map_sel):
+            _sel_row = _map_sel.iloc[0]
+            _fig_map.add_trace(go.Scattermapbox(
+                lat=[_sel_row["lat"]],
+                lon=[_sel_row["lon"]],
+                mode="markers+text",
+                name="Seleccionado",
+                marker=dict(size=24, color="#C8A96E", opacity=1.0),
+                text=[_d_sel_puesto],
+                textposition="top center",
+                textfont=dict(size=11, color="#C8A96E"),
+                hoverinfo="text",
+                hovertext=(
+                    f"<b>★ {_sel_row['puesto']}</b><br>"
+                    f"Abelardo: {_sel_row['pct_abelardo']:.1f}%<br>"
+                    f"Válidos: {int(_sel_row['total_validos']):,}"
+                ),
+            ))
+            # Centrar mapa en el puesto seleccionado
+            _map_center = {"lat": _sel_row["lat"], "lon": _sel_row["lon"]}
+            _map_zoom   = 14
+        else:
+            _map_center = {"lat": 6.244, "lon": -75.581}
+            _map_zoom   = 12
+
         _fig_map.update_layout(
-            height=500,
+            mapbox=dict(
+                style="carto-positron",
+                zoom=_map_zoom,
+                center=_map_center,
+            ),
+            height=520,
             margin=dict(l=0, r=0, t=0, b=0),
             paper_bgcolor="rgba(0,0,0,0)",
-            coloraxis_colorbar=dict(
-                title="% AE",
-                tickfont=dict(color="#9A9A90", size=11),
-                title_font=dict(color="#9A9A90"),
-                thickness=12,
-                len=0.6,
+            legend=dict(
+                orientation="h",
+                yanchor="bottom", y=0.02,
+                xanchor="left", x=0.02,
+                bgcolor="rgba(255,255,255,0.85)",
+                bordercolor="#cccccc", borderwidth=1,
+                font=dict(color="#333333", size=11),
             ),
         )
         st.plotly_chart(_fig_map, use_container_width=True,
@@ -2613,11 +2702,12 @@ with t_medellin:
         st.subheader("Puestos por % Abelardo")
 
         _bar_df = _fp.copy().sort_values("pct_abelardo", ascending=True)
-        _bar_df["color"] = _bar_df["semaforo"].map(
-            {"verde": "#1f77b4", "amarillo": "#C8A96E", "rojo": "#CC0000"}
-        ).fillna("#9e9e9e")
+        _bar_df["color"] = _bar_df.apply(
+            lambda r: "#C8A96E" if r["puesto"] == _d_sel_puesto
+                      else ("#CC0000" if r["semaforo"] != "verde" else "#1f77b4"),
+            axis=1,
+        )
 
-        # Limitar a top/bottom 20 si hay muchos puestos
         if len(_bar_df) > 40:
             _bar_df = pd.concat([_bar_df.head(20), _bar_df.tail(20)])
 
@@ -2629,7 +2719,7 @@ with t_medellin:
             text=_bar_df["pct_abelardo"].apply(lambda v: f"{v:.1f}%"),
             textposition="outside",
             textfont=dict(size=10, family="IBM Plex Mono", color="#9A9A90"),
-            customdata=_bar_df[["votos_abelardo", "total_validos", "semaforo"]].values,
+            customdata=_bar_df[["votos_abelardo", "total_validos"]].values,
             hovertemplate=(
                 "<b>%{y}</b><br>"
                 "Abelardo: <b>%{x:.1f}%</b><br>"
@@ -2638,20 +2728,14 @@ with t_medellin:
             ),
         ))
         _fig_bar.update_layout(
-            height=500,
+            height=520,
             margin=dict(l=0, r=60, t=10, b=10),
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="#111111",
-            xaxis=dict(
-                range=[0, 100],
-                ticksuffix="%",
-                gridcolor="#1E1E1E",
-                tickfont=dict(color="#9A9A90"),
-            ),
-            yaxis=dict(
-                gridcolor="rgba(0,0,0,0)",
-                tickfont=dict(color="#9A9A90", size=9),
-            ),
+            xaxis=dict(range=[0, 100], ticksuffix="%",
+                       gridcolor="#1E1E1E", tickfont=dict(color="#9A9A90")),
+            yaxis=dict(gridcolor="rgba(0,0,0,0)",
+                       tickfont=dict(color="#9A9A90", size=9)),
             showlegend=False,
         )
         st.plotly_chart(_fig_bar, use_container_width=True,
@@ -2659,39 +2743,8 @@ with t_medellin:
 
     st.divider()
 
-    # ── Drill-down: Comuna → Puesto → Mesa a mesa ─────────────────────────────
-    st.subheader("Análisis mesa a mesa")
-
-    _CANDS_4 = {
-        "v_abelardo_de_la_espriella": ("Abelardo", "#1f77b4"),
-        "v_ivan_cepeda":              ("Cepeda",   "#CC0000"),
-        "v_paloma_valencia":          ("Paloma",   "#2ca02c"),
-        "v_sergio_fajardo":           ("Fajardo",  "#ff7f0e"),
-    }
-
-    # Selectores en cascada
-    _drill_c1, _drill_c2 = st.columns(2)
-
-    with _drill_c1:
-        _d_com_opts = ["— Todas las comunas —"] + [
-            _MED_COM_NAMES[k]
-            for k in sorted(_MED_COM_NAMES.keys())
-            if k in _med_p_all["cod_comune"].values
-        ]
-        _d_sel_com = st.selectbox("Seleccionar comuna", _d_com_opts, key="drill_com")
-
-    # Filtrar puestos según commune seleccionada
-    if _d_sel_com == "— Todas las comunas —":
-        _d_puestos_df = _med_p_all.copy()
-        _d_mesas_pool = _med_m_all.copy()
-    else:
-        _d_puestos_df = _med_p_all[_med_p_all["comuna_label"] == _d_sel_com].copy()
-        _d_mesas_pool = _med_m_all[_med_m_all["comuna_label"] == _d_sel_com].copy()
-
-    _d_puesto_opts = sorted(_d_puestos_df["puesto"].unique().tolist())
-
-    with _drill_c2:
-        _d_sel_puesto = st.selectbox("Seleccionar puesto", _d_puesto_opts, key="drill_puesto")
+    # ── Drill-down: Mesa a mesa del puesto seleccionado ───────────────────────
+    st.subheader(f"Análisis mesa a mesa — {_d_sel_puesto}")
 
     # ── Mesas del puesto seleccionado ─────────────────────────────────────────
     _d_mesas = _d_mesas_pool[
