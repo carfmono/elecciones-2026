@@ -3757,22 +3757,15 @@ with t_medellin:
     def _build_age_segments(mesas_df):
         _df = mesas_df[mesas_df["total_validos"] > 0].copy()
         _df = _df.sort_values(["puesto", "mesa"])
-
-        def _seg(g):
-            n = len(g)
-            g = g.copy()
-            if n == 1:
-                g["segmento"] = "40–59 años"
-                return g
-            g["_r"] = (g["mesa"].rank(method="first") - 1) / (n - 1)
-            g["segmento"] = pd.cut(
-                g["_r"],
-                bins=[-0.001, 0.25, 0.5, 0.75, 1.001],
-                labels=["60+ años", "40–59 años", "25–39 años", "18–24 años"],
-            ).astype(str)
-            return g.drop(columns=["_r"])
-
-        return _df.groupby("puesto", group_keys=False).apply(_seg)
+        _n    = _df.groupby("puesto")["mesa"].transform("count")
+        _rank = _df.groupby("puesto")["mesa"].rank(method="first")
+        _rel  = (_rank - 1) / (_n - 1).clip(lower=1)
+        _df["segmento"] = pd.cut(
+            _rel,
+            bins=[-0.001, 0.25, 0.5, 0.75, 1.001],
+            labels=["60+ años", "40–59 años", "25–39 años", "18–24 años"],
+        ).astype(str)
+        return _df
 
     _med_m_seg = _build_age_segments(_med_m_all)
 
@@ -3943,18 +3936,27 @@ with t_medellin:
     # ── Por comuna: AE% por grupo etario ─────────────────────────────────────
     st.markdown("##### AE% por grupo etario en cada comuna")
 
-    _seg_com = (
-        _med_m_seg.merge(_med_p_all[["puesto","comuna_label"]], on="puesto", how="left")
-        .groupby(["comuna_label","segmento"])
-        .agg(v_ae=("v_abelardo_de_la_espriella","sum"), total=("total_validos","sum"))
-        .reset_index()
-    )
-    _seg_com["pct_ae"] = (_seg_com["v_ae"] / _seg_com["total"] * 100).round(1)
-    _seg_com["segmento"] = pd.Categorical(_seg_com["segmento"], categories=_SEG_ORDER, ordered=True)
-    _seg_com = _seg_com.sort_values(["segmento","pct_ae"])
+    _seg_m_com = _med_m_seg.merge(_med_p_all[["puesto","comuna_label"]], on="puesto", how="left")
 
-    _seg_com_wide = _seg_com.pivot(index="comuna_label", columns="segmento", values="pct_ae").reset_index()
-    _seg_com_wide["pct_ae_total"] = _seg_com_wide[_SEG_ORDER].mean(axis=1)
+    _seg_com_all = (
+        _seg_m_com.groupby(["comuna_label","segmento"])
+        .agg(
+            v_ae    =("v_abelardo_de_la_espriella", "sum"),
+            v_ic    =("v_ivan_cepeda",              "sum"),
+            v_paloma=("v_paloma_valencia",          "sum"),
+            v_fajardo=("v_sergio_fajardo",          "sum"),
+            total   =("total_validos",              "sum"),
+        ).reset_index()
+    )
+    _seg_com_all["pct_ae"] = (_seg_com_all["v_ae"] / _seg_com_all["total"] * 100).round(1)
+    _seg_com_all["pct_ic"] = (_seg_com_all["v_ic"] / _seg_com_all["total"] * 100).round(1)
+
+    _seg_com_wide = _seg_com_all.pivot(
+        index="comuna_label", columns="segmento", values="pct_ae"
+    ).reset_index()
+    _seg_com_wide["pct_ae_total"] = _seg_com_wide[
+        [s for s in _SEG_ORDER if s in _seg_com_wide.columns]
+    ].mean(axis=1)
     _seg_com_wide = _seg_com_wide.sort_values("pct_ae_total", ascending=False)
 
     _fig_com_et = go.Figure()
@@ -3980,16 +3982,111 @@ with t_medellin:
     )
     st.plotly_chart(_fig_com_et, use_container_width=True, config={"displayModeBar": False})
 
-    # Tabla resumen etario por comuna
-    _tbl_seg_com = _seg_com_wide[["comuna_label"] + _SEG_ORDER].rename(
-        columns={"comuna_label": "Comuna"}
-    ).reset_index(drop=True)
+    st.divider()
+    st.markdown("##### Tabla completa por comuna")
+
+    # ── Tabla 1: resumen general por comuna ───────────────────────────────────
+    _com_resumen = (
+        _med_p_all.groupby("comuna_label")
+        .agg(
+            puestos  =("puesto",                    "count"),
+            mesas    =("n_mesas",                   "sum"),
+            validos  =("total_validos",              "sum"),
+            v_ae     =("v_abelardo_de_la_espriella", "sum"),
+            v_ic     =("v_ivan_cepeda",              "sum"),
+            v_paloma =("v_paloma_valencia",          "sum"),
+            v_fajardo=("v_sergio_fajardo",           "sum"),
+        ).reset_index()
+    )
+    _com_resumen["pct_ae"]     = (_com_resumen["v_ae"]      / _com_resumen["validos"] * 100).round(1)
+    _com_resumen["pct_ic"]     = (_com_resumen["v_ic"]      / _com_resumen["validos"] * 100).round(1)
+    _com_resumen["pct_paloma"] = (_com_resumen["v_paloma"]  / _com_resumen["validos"] * 100).round(1)
+    _com_resumen["pct_fajardo"]= (_com_resumen["v_fajardo"] / _com_resumen["validos"] * 100).round(1)
+    _com_resumen = _com_resumen.sort_values("pct_ae", ascending=False)
+
+    # Fila Total Medellín
+    _total_row = pd.DataFrame([{
+        "comuna_label": "TOTAL MEDELLÍN",
+        "puestos":   _com_resumen["puestos"].sum(),
+        "mesas":     _com_resumen["mesas"].sum(),
+        "validos":   _com_resumen["validos"].sum(),
+        "v_ae":      _com_resumen["v_ae"].sum(),
+        "v_ic":      _com_resumen["v_ic"].sum(),
+        "v_paloma":  _com_resumen["v_paloma"].sum(),
+        "v_fajardo": _com_resumen["v_fajardo"].sum(),
+        "pct_ae":    round(_com_resumen["v_ae"].sum()      / _com_resumen["validos"].sum() * 100, 1),
+        "pct_ic":    round(_com_resumen["v_ic"].sum()      / _com_resumen["validos"].sum() * 100, 1),
+        "pct_paloma":round(_com_resumen["v_paloma"].sum()  / _com_resumen["validos"].sum() * 100, 1),
+        "pct_fajardo":round(_com_resumen["v_fajardo"].sum()/ _com_resumen["validos"].sum() * 100, 1),
+    }])
+    _com_resumen = pd.concat([_com_resumen, _total_row], ignore_index=True)
+
+    _tbl1 = _com_resumen[[
+        "comuna_label","puestos","mesas","validos",
+        "v_ae","pct_ae","v_ic","pct_ic","v_paloma","pct_paloma","v_fajardo","pct_fajardo",
+    ]].rename(columns={
+        "comuna_label":"Comuna","puestos":"Puestos","mesas":"Mesas","validos":"Válidos",
+        "v_ae":"Votos AE","pct_ae":"% AE","v_ic":"Votos IC","pct_ic":"% IC",
+        "v_paloma":"Votos Paloma","pct_paloma":"% Paloma","v_fajardo":"Votos Fajardo","pct_fajardo":"% Fajardo",
+    }).reset_index(drop=True)
+    for _c in ["Válidos","Votos AE","Votos IC","Votos Paloma","Votos Fajardo"]:
+        _tbl1[_c] = _tbl1[_c].apply(lambda v: f"{int(v):,}")
+    for _c in ["% AE","% IC","% Paloma","% Fajardo"]:
+        _tbl1[_c] = _tbl1[_c].apply(lambda v: f"{v:.1f}%")
+    _tbl1["Mesas"] = _tbl1["Mesas"].apply(lambda v: f"{int(v):,}")
+
+    st.caption("Votos válidos. Fuente: Registraduría – preconteo 31 mayo 2026. No incluye votos en blanco ni nulos.")
+    st.dataframe(_tbl1, use_container_width=True, hide_index=True)
+
+    st.divider()
+
+    # ── Tabla 2: segmentación etaria por comuna ───────────────────────────────
+    st.markdown("##### AE% y IC% por grupo etario · por comuna")
+
+    _ic_com_wide = _seg_com_all.pivot(
+        index="comuna_label", columns="segmento", values="pct_ic"
+    ).reset_index()
+
+    _tbl2 = _seg_com_wide[["comuna_label"] + [s for s in _SEG_ORDER if s in _seg_com_wide.columns]].copy()
+    _tbl2.columns = ["Comuna"] + [f"AE {s}" for s in _SEG_ORDER if s in _seg_com_wide.columns]
+
     for _sg in _SEG_ORDER:
-        if _sg in _tbl_seg_com.columns:
-            _tbl_seg_com[_sg] = _tbl_seg_com[_sg].apply(
-                lambda v: f"{v:.1f}%" if pd.notna(v) else "—"
-            )
-    st.dataframe(_tbl_seg_com, use_container_width=True, hide_index=True)
+        _ic_col = f"IC {_sg}"
+        if _sg in _ic_com_wide.columns:
+            _tbl2[_ic_col] = _ic_com_wide.set_index("comuna_label").reindex(
+                _tbl2["Comuna"]
+            )[_sg].values
+
+    # Tendencia AE (60+ vs 18-24)
+    _ae_60 = f"AE 60+ años"
+    _ae_18 = f"AE 18–24 años"
+    if _ae_60 in _tbl2.columns and _ae_18 in _tbl2.columns:
+        _tbl2["Tend. AE"] = _tbl2.apply(
+            lambda r: "jóv. > may." if (pd.notna(r[_ae_18]) and pd.notna(r[_ae_60]) and r[_ae_18] > r[_ae_60])
+                      else ("may. > jóv." if (pd.notna(r[_ae_18]) and pd.notna(r[_ae_60])) else "—"),
+            axis=1,
+        )
+
+    # Fila total ciudad
+    _total_et = {"Comuna": "TOTAL MEDELLÍN"}
+    for _sg in _SEG_ORDER:
+        _g = _seg_city[_seg_city["segmento"] == _sg]
+        if not _g.empty:
+            _total_et[f"AE {_sg}"] = _g.iloc[0]["pct_ae"]
+            _total_et[f"IC {_sg}"] = _g.iloc[0]["pct_ic"]
+    _total_et["Tend. AE"] = (
+        "jóv. > may."
+        if _total_et.get("AE 18–24 años", 0) > _total_et.get("AE 60+ años", 0)
+        else "may. > jóv."
+    )
+    _tbl2 = pd.concat([_tbl2, pd.DataFrame([_total_et])], ignore_index=True)
+
+    # Formatear
+    for _c in _tbl2.columns:
+        if _c not in ["Comuna","Tend. AE"]:
+            _tbl2[_c] = _tbl2[_c].apply(lambda v: f"{v:.1f}%" if pd.notna(v) else "—")
+
+    st.dataframe(_tbl2, use_container_width=True, hide_index=True)
 
 
 # ── Tab Área Metropolitana ────────────────────────────────────────────────────
