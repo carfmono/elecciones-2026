@@ -4175,53 +4175,44 @@ with t_medellin:
 
     st.divider()
 
-    # ── Tabla 2: segmentación etaria por comuna ───────────────────────────────
-    st.markdown("##### AE% y IC% por grupo etario · por comuna")
+    # ── Tabla 2: los 4 candidatos × grupo etario × comuna ────────────────────
+    st.markdown("##### Grupo etario por comuna — los 4 candidatos")
 
-    _ic_com_wide = _seg_com_all.pivot(
-        index="comuna_label", columns="segmento", values="pct_ic"
-    ).reset_index()
+    # Asegurar pct_paloma y pct_fajardo en _seg_com_all
+    if "pct_paloma" not in _seg_com_all.columns:
+        _seg_com_all["pct_paloma"]  = (_seg_com_all["v_paloma"]  / _seg_com_all["total"] * 100).round(1)
+    if "pct_fajardo" not in _seg_com_all.columns:
+        _seg_com_all["pct_fajardo"] = (_seg_com_all["v_fajardo"] / _seg_com_all["total"] * 100).round(1)
 
-    _tbl2 = _seg_com_wide[["comuna_label"] + [s for s in _SEG_ORDER if s in _seg_com_wide.columns]].copy()
-    _tbl2.columns = ["Comuna"] + [f"AE {s}" for s in _SEG_ORDER if s in _seg_com_wide.columns]
-
-    for _sg in _SEG_ORDER:
-        _ic_col = f"IC {_sg}"
-        if _sg in _ic_com_wide.columns:
-            _tbl2[_ic_col] = _ic_com_wide.set_index("comuna_label").reindex(
-                _tbl2["Comuna"]
-            )[_sg].values
-
-    # Tendencia AE (60+ vs 18-24)
-    _ae_60 = f"AE 60+ años"
-    _ae_18 = f"AE 18–24 años"
-    if _ae_60 in _tbl2.columns and _ae_18 in _tbl2.columns:
-        _tbl2["Tend. AE"] = _tbl2.apply(
-            lambda r: "jóv. > may." if (pd.notna(r[_ae_18]) and pd.notna(r[_ae_60]) and r[_ae_18] > r[_ae_60])
-                      else ("may. > jóv." if (pd.notna(r[_ae_18]) and pd.notna(r[_ae_60])) else "—"),
-            axis=1,
-        )
-
-    # Fila total ciudad
-    _total_et = {"Comuna": "TOTAL MEDELLÍN"}
-    for _sg in _SEG_ORDER:
-        _g = _seg_city[_seg_city["segmento"] == _sg]
-        if not _g.empty:
-            _total_et[f"AE {_sg}"] = _g.iloc[0]["pct_ae"]
-            _total_et[f"IC {_sg}"] = _g.iloc[0]["pct_ic"]
-    _total_et["Tend. AE"] = (
-        "jóv. > may."
-        if _total_et.get("AE 18–24 años", 0) > _total_et.get("AE 60+ años", 0)
-        else "may. > jóv."
+    _seg_com_all["segmento"] = pd.Categorical(
+        _seg_com_all["segmento"], categories=_SEG_ORDER, ordered=True
     )
-    _tbl2 = pd.concat([_tbl2, pd.DataFrame([_total_et])], ignore_index=True)
 
-    # Formatear
-    for _c in _tbl2.columns:
-        if _c not in ["Comuna","Tend. AE"]:
-            _tbl2[_c] = _tbl2[_c].apply(lambda v: f"{v:.1f}%" if pd.notna(v) else "—")
+    # Construir tabla larga: fila = (comuna, grupo etario)
+    _seg_long = _seg_com_all.sort_values(["comuna_label","segmento"]).copy()
+    _seg_long = _seg_long.rename(columns={
+        "comuna_label":"Comuna","segmento":"Grupo etario",
+        "pct_ae":"% AE","pct_ic":"% IC","pct_paloma":"% Paloma","pct_fajardo":"% Fajardo",
+        "total":"Válidos",
+    })
 
-    st.dataframe(_tbl2, use_container_width=True, hide_index=True)
+    # Filas de total ciudad por grupo etario
+    _seg_city_long = _seg_city.rename(columns={
+        "segmento":"Grupo etario","pct_ae":"% AE","pct_ic":"% IC",
+        "pct_paloma":"% Paloma","pct_fajardo":"% Fajardo","total":"Válidos",
+    }).copy()
+    _seg_city_long["Comuna"] = "TOTAL MEDELLÍN"
+
+    _tbl2 = pd.concat([
+        _seg_long[["Comuna","Grupo etario","Válidos","% AE","% IC","% Paloma","% Fajardo"]],
+        _seg_city_long[["Comuna","Grupo etario","Válidos","% AE","% IC","% Paloma","% Fajardo"]],
+    ], ignore_index=True)
+
+    for _c in ["% AE","% IC","% Paloma","% Fajardo"]:
+        _tbl2[_c] = _tbl2[_c].apply(lambda v: f"{v:.1f}%" if pd.notna(v) else "—")
+    _tbl2["Válidos"] = _tbl2["Válidos"].apply(lambda v: f"{int(v):,}" if pd.notna(v) else "—")
+
+    st.dataframe(_tbl2, use_container_width=True, hide_index=True, height=600)
 
 
 # ── Tab Área Metropolitana ────────────────────────────────────────────────────
