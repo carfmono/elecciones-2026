@@ -4021,6 +4021,66 @@ with t_medellin:
 
     st.divider()
 
+    # ── Mapa por puesto: coalición AE + Paloma + Fajardo ─────────────────────
+    st.markdown("##### Mapa por puesto — votos AE + Paloma + Fajardo")
+
+    _fp_coal = _med_p_all.dropna(subset=["lat","lon"]).copy()
+    _fp_coal["v_coalition"] = (
+        _fp_coal["v_abelardo_de_la_espriella"]
+        + _fp_coal["v_paloma_valencia"]
+        + _fp_coal["v_sergio_fajardo"]
+    )
+    _fp_coal["pct_coal"] = (_fp_coal["v_coalition"] / _fp_coal["total_validos"] * 100).round(1)
+    _fp_coal["pct_ic"]   = (_fp_coal["v_ivan_cepeda"] / _fp_coal["total_validos"] * 100).round(1)
+    _fp_coal["pct_ae_p"] = (_fp_coal["v_abelardo_de_la_espriella"] / _fp_coal["total_validos"] * 100).round(1)
+    _fp_coal["ms"] = (_fp_coal["total_validos"] / _fp_coal["total_validos"].max() * 14 + 5).clip(5, 20)
+    _fp_coal["hover"] = (
+        "<b>" + _fp_coal["puesto"] + "</b><br>"
+        + "AE+Paloma+Fajardo: <b>" + _fp_coal["pct_coal"].map(lambda x: f"{x:.1f}%") + "</b><br>"
+        + "Cepeda: " + _fp_coal["pct_ic"].map(lambda x: f"{x:.1f}%") + "<br>"
+        + "Solo AE: " + _fp_coal["pct_ae_p"].map(lambda x: f"{x:.1f}%") + "<br>"
+        + "Válidos: " + _fp_coal["total_validos"].map(lambda x: f"{int(x):,}")
+    )
+
+    _fig_coal_map = go.Figure(go.Scattermapbox(
+        lat=_fp_coal["lat"],
+        lon=_fp_coal["lon"],
+        mode="markers",
+        marker=go.scattermapbox.Marker(
+            size=_fp_coal["ms"],
+            color=_fp_coal["pct_coal"],
+            colorscale=[
+                [0.0, "#1565C0"],
+                [0.4, "#64B5F6"],
+                [0.5, "#F0ECE4"],
+                [0.6, "#E8C87A"],
+                [1.0, "#A07820"],
+            ],
+            cmin=35, cmax=70,
+            colorbar=dict(
+                title="% Coalición", x=1.0, thickness=14, len=0.6,
+                tickfont=dict(color="#333", size=11),
+                title_font=dict(color="#333"),
+                ticksuffix="%",
+            ),
+            opacity=0.88,
+        ),
+        text=_fp_coal["hover"],
+        hovertemplate="%{text}<extra></extra>",
+        name="Puestos",
+    ))
+    _fig_coal_map.update_layout(
+        mapbox=dict(style="carto-positron", zoom=10.5,
+                    center={"lat": 6.247, "lon": -75.565}),
+        height=600,
+        margin=dict(l=0, r=0, t=0, b=0),
+        paper_bgcolor="rgba(0,0,0,0)",
+    )
+    st.plotly_chart(_fig_coal_map, use_container_width=True,
+                    config={"scrollZoom": True, "displayModeBar": False})
+
+    st.divider()
+
     # ── Por comuna: 4 candidatos por grupo etario ────────────────────────────
     st.markdown("##### Los 4 candidatos por grupo etario en cada comuna")
 
@@ -4041,42 +4101,80 @@ with t_medellin:
     _seg_com_all["pct_paloma"] = (_seg_com_all["v_paloma"] / _seg_com_all["total"] * 100).round(1)
     _seg_com_all["pct_fajardo"]= (_seg_com_all["v_fajardo"]/ _seg_com_all["total"] * 100).round(1)
 
-    _CANDS_ET = [
-        ("pct_ae",     "Abelardo De La Espriella", "#C8A96E"),
-        ("pct_ic",     "Iván Cepeda Castro",        "#4A90C0"),
-        ("pct_paloma", "Paloma Valencia",            "#7B5EA7"),
-        ("pct_fajardo","Sergio Fajardo",             "#6BAF6B"),
+    _seg_com_asig = _seg_com_all[_seg_com_all["cod_comuna"] != 0]
+    _com_options_et = (
+        _seg_com_asig[["cod_comuna","comuna_label"]].drop_duplicates()
+        .sort_values("cod_comuna")["comuna_label"].tolist()
+    )
+    _sel_com_et = st.selectbox(
+        "Seleccionar comuna", ["Medellín total"] + _com_options_et, key="sel_com_et"
+    )
+
+    if _sel_com_et == "Medellín total":
+        _et_agg = _seg_com_asig.groupby("segmento").agg(
+            v_ae     =("v_ae",      "sum"),
+            v_ic     =("v_ic",      "sum"),
+            v_paloma =("v_paloma",  "sum"),
+            v_fajardo=("v_fajardo", "sum"),
+            total    =("total",     "sum"),
+        ).reset_index()
+    else:
+        _et_agg = (
+            _seg_com_asig[_seg_com_asig["comuna_label"] == _sel_com_et]
+            .groupby("segmento").agg(
+                v_ae     =("v_ae",      "sum"),
+                v_ic     =("v_ic",      "sum"),
+                v_paloma =("v_paloma",  "sum"),
+                v_fajardo=("v_fajardo", "sum"),
+                total    =("total",     "sum"),
+            ).reset_index()
+        )
+
+    _et_agg["pct_ae"]     = (_et_agg["v_ae"]      / _et_agg["total"] * 100).round(1)
+    _et_agg["pct_ic"]     = (_et_agg["v_ic"]      / _et_agg["total"] * 100).round(1)
+    _et_agg["pct_paloma"] = (_et_agg["v_paloma"]  / _et_agg["total"] * 100).round(1)
+    _et_agg["pct_fajardo"]= (_et_agg["v_fajardo"] / _et_agg["total"] * 100).round(1)
+    _et_agg["pct_otros"]  = (
+        100 - _et_agg["pct_ae"] - _et_agg["pct_ic"] - _et_agg["pct_paloma"] - _et_agg["pct_fajardo"]
+    ).clip(lower=0).round(1)
+    _et_agg["segmento"] = pd.Categorical(_et_agg["segmento"], categories=_SEG_ORDER, ordered=True)
+    _et_agg = _et_agg.sort_values("segmento")
+
+    _STACK_CANDS = [
+        ("pct_ae",     "Abelardo", "#4A90C0"),
+        ("pct_ic",     "Cepeda",   "#CC0000"),
+        ("pct_paloma", "Paloma",   "#4CAF50"),
+        ("pct_fajardo","Fajardo",  "#FF8C00"),
+        ("pct_otros",  "Otros",    "#666666"),
     ]
 
-    _cols_et = st.columns(2)
-    for _ci, (_pct_col, _cname, _ccolor) in enumerate(_CANDS_ET):
-        _wide_et = _seg_com_all.pivot_table(
-            index=["cod_comuna","comuna_label"], columns="segmento", values=_pct_col
-        ).reset_index().sort_values("cod_comuna")
-        _fig_et = go.Figure()
-        for _sg, _sc in _SEG_COLORS.items():
-            if _sg in _wide_et.columns:
-                _fig_et.add_trace(go.Bar(
-                    name=_sg,
-                    x=_wide_et["comuna_label"],
-                    y=_wide_et[_sg],
-                    marker_color=_sc,
-                    hovertemplate=f"<b>%{{x}}</b><br>{_sg}: %{{y:.1f}}%<extra></extra>",
-                ))
-        _fig_et.update_layout(
-            title=dict(text=_cname, font=dict(color=_ccolor, size=13), x=0),
-            barmode="group", height=380,
-            margin=dict(l=0, r=0, t=36, b=0),
-            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#111111",
-            xaxis=dict(tickangle=-40, tickfont=dict(color="#9A9A90", size=8),
-                       gridcolor="rgba(0,0,0,0)"),
-            yaxis=dict(ticksuffix="%", gridcolor="#1E1E1E", tickfont=dict(color="#9A9A90")),
-            legend=dict(title="Grupo etario", orientation="h", yanchor="bottom", y=1.05,
-                        xanchor="left", x=0, font=dict(color="#9A9A90", size=9),
-                        bgcolor="rgba(0,0,0,0)"),
-        )
-        with _cols_et[_ci % 2]:
-            st.plotly_chart(_fig_et, use_container_width=True, config={"displayModeBar": False})
+    _fig_stack = go.Figure()
+    for _pct, _lbl, _col in _STACK_CANDS:
+        _vals = _et_agg[_pct]
+        _fig_stack.add_trace(go.Bar(
+            name=_lbl,
+            x=_et_agg["segmento"],
+            y=_vals,
+            marker_color=_col,
+            text=_vals.map(lambda v: f"{v:.1f}%" if v >= 2 else ""),
+            textposition="inside",
+            insidetextanchor="middle",
+            textfont=dict(color="white", size=13, family="IBM Plex Mono"),
+            hovertemplate=f"<b>%{{x}}</b><br>{_lbl}: %{{y:.1f}}%<extra></extra>",
+        ))
+    _fig_stack.update_layout(
+        barmode="stack",
+        height=480,
+        margin=dict(l=0, r=0, t=10, b=0),
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#0A0A0A",
+        xaxis=dict(tickfont=dict(color="#F0EDE8", size=13), gridcolor="rgba(0,0,0,0)"),
+        yaxis=dict(ticksuffix="%", range=[0, 100], gridcolor="#1E1E1E",
+                   tickfont=dict(color="#9A9A90")),
+        legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="left", x=0,
+                    font=dict(color="#9A9A90", size=11), bgcolor="rgba(0,0,0,0)",
+                    traceorder="normal"),
+    )
+    st.plotly_chart(_fig_stack, use_container_width=True, config={"displayModeBar": False})
 
     st.divider()
     st.markdown("##### Tabla completa por comuna")
