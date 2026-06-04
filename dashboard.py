@@ -4021,54 +4021,62 @@ with t_medellin:
 
     st.divider()
 
-    # ── Por comuna: AE% por grupo etario ─────────────────────────────────────
-    st.markdown("##### AE% por grupo etario en cada comuna")
+    # ── Por comuna: 4 candidatos por grupo etario ────────────────────────────
+    st.markdown("##### Los 4 candidatos por grupo etario en cada comuna")
 
-    _seg_m_com = _med_m_seg  # ya tiene comuna_label desde load_medellin_data()
+    _seg_m_com = _med_m_seg  # ya tiene comuna_label y cod_comuna desde load_medellin_data()
 
     _seg_com_all = (
-        _seg_m_com.groupby(["comuna_label","segmento"])
+        _seg_m_com.groupby(["cod_comuna", "comuna_label", "segmento"])
         .agg(
-            v_ae    =("v_abelardo_de_la_espriella", "sum"),
-            v_ic    =("v_ivan_cepeda",              "sum"),
-            v_paloma=("v_paloma_valencia",          "sum"),
-            v_fajardo=("v_sergio_fajardo",          "sum"),
-            total   =("total_validos",              "sum"),
+            v_ae     =("v_abelardo_de_la_espriella", "sum"),
+            v_ic     =("v_ivan_cepeda",              "sum"),
+            v_paloma =("v_paloma_valencia",          "sum"),
+            v_fajardo=("v_sergio_fajardo",           "sum"),
+            total    =("total_validos",              "sum"),
         ).reset_index()
     )
-    _seg_com_all["pct_ae"] = (_seg_com_all["v_ae"] / _seg_com_all["total"] * 100).round(1)
-    _seg_com_all["pct_ic"] = (_seg_com_all["v_ic"] / _seg_com_all["total"] * 100).round(1)
+    _seg_com_all["pct_ae"]     = (_seg_com_all["v_ae"]     / _seg_com_all["total"] * 100).round(1)
+    _seg_com_all["pct_ic"]     = (_seg_com_all["v_ic"]     / _seg_com_all["total"] * 100).round(1)
+    _seg_com_all["pct_paloma"] = (_seg_com_all["v_paloma"] / _seg_com_all["total"] * 100).round(1)
+    _seg_com_all["pct_fajardo"]= (_seg_com_all["v_fajardo"]/ _seg_com_all["total"] * 100).round(1)
 
-    _seg_com_wide = _seg_com_all.pivot(
-        index="comuna_label", columns="segmento", values="pct_ae"
-    ).reset_index()
-    _seg_com_wide["pct_ae_total"] = _seg_com_wide[
-        [s for s in _SEG_ORDER if s in _seg_com_wide.columns]
-    ].mean(axis=1)
-    _seg_com_wide = _seg_com_wide.sort_values("pct_ae_total", ascending=False)
+    _CANDS_ET = [
+        ("pct_ae",     "Abelardo De La Espriella", "#C8A96E"),
+        ("pct_ic",     "Iván Cepeda Castro",        "#4A90C0"),
+        ("pct_paloma", "Paloma Valencia",            "#7B5EA7"),
+        ("pct_fajardo","Sergio Fajardo",             "#6BAF6B"),
+    ]
 
-    _fig_com_et = go.Figure()
-    for _sg, _sc in _SEG_COLORS.items():
-        if _sg in _seg_com_wide.columns:
-            _fig_com_et.add_trace(go.Bar(
-                name=_sg,
-                x=_seg_com_wide["comuna_label"],
-                y=_seg_com_wide[_sg],
-                marker_color=_sc,
-                hovertemplate=f"<b>%{{x}}</b><br>{_sg}: %{{y:.1f}}%<extra></extra>",
-            ))
-    _fig_com_et.update_layout(
-        barmode="group", height=420,
-        margin=dict(l=0, r=0, t=10, b=0),
-        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#111111",
-        xaxis=dict(tickangle=-40, tickfont=dict(color="#9A9A90", size=9),
-                   gridcolor="rgba(0,0,0,0)"),
-        yaxis=dict(ticksuffix="%", gridcolor="#1E1E1E", tickfont=dict(color="#9A9A90")),
-        legend=dict(title="Grupo etario", orientation="h", yanchor="bottom", y=1.01,
-                    xanchor="left", x=0, font=dict(color="#9A9A90", size=11),
-                    bgcolor="rgba(0,0,0,0)"),
-    )
-    st.plotly_chart(_fig_com_et, use_container_width=True, config={"displayModeBar": False})
+    _cols_et = st.columns(2)
+    for _ci, (_pct_col, _cname, _ccolor) in enumerate(_CANDS_ET):
+        _wide_et = _seg_com_all.pivot_table(
+            index=["cod_comuna","comuna_label"], columns="segmento", values=_pct_col
+        ).reset_index().sort_values("cod_comuna")
+        _fig_et = go.Figure()
+        for _sg, _sc in _SEG_COLORS.items():
+            if _sg in _wide_et.columns:
+                _fig_et.add_trace(go.Bar(
+                    name=_sg,
+                    x=_wide_et["comuna_label"],
+                    y=_wide_et[_sg],
+                    marker_color=_sc,
+                    hovertemplate=f"<b>%{{x}}</b><br>{_sg}: %{{y:.1f}}%<extra></extra>",
+                ))
+        _fig_et.update_layout(
+            title=dict(text=_cname, font=dict(color=_ccolor, size=13), x=0),
+            barmode="group", height=380,
+            margin=dict(l=0, r=0, t=36, b=0),
+            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#111111",
+            xaxis=dict(tickangle=-40, tickfont=dict(color="#9A9A90", size=8),
+                       gridcolor="rgba(0,0,0,0)"),
+            yaxis=dict(ticksuffix="%", gridcolor="#1E1E1E", tickfont=dict(color="#9A9A90")),
+            legend=dict(title="Grupo etario", orientation="h", yanchor="bottom", y=1.05,
+                        xanchor="left", x=0, font=dict(color="#9A9A90", size=9),
+                        bgcolor="rgba(0,0,0,0)"),
+        )
+        with _cols_et[_ci % 2]:
+            st.plotly_chart(_fig_et, use_container_width=True, config={"displayModeBar": False})
 
     st.divider()
     st.markdown("##### Tabla completa por comuna")
@@ -4104,7 +4112,7 @@ with t_medellin:
 
     # ── Tabla 1: resumen general por comuna ───────────────────────────────────
     _com_resumen = (
-        _med_p_all.groupby("comuna_label")
+        _med_p_all.groupby(["cod_comune","comuna_label"])
         .agg(
             puestos  =("puesto",                    "count"),
             mesas    =("n_mesas",                   "sum"),
@@ -4123,7 +4131,7 @@ with t_medellin:
     _com_resumen["pct_ic"]      = (_com_resumen["v_ic"]      / _com_resumen["validos"] * 100).round(1)
     _com_resumen["pct_paloma"]  = (_com_resumen["v_paloma"]  / _com_resumen["validos"] * 100).round(1)
     _com_resumen["pct_fajardo"] = (_com_resumen["v_fajardo"] / _com_resumen["validos"] * 100).round(1)
-    _com_resumen = _com_resumen.sort_values("pct_ae", ascending=False)
+    _com_resumen = _com_resumen.sort_values("cod_comune")
 
     # Fila Total Medellín
     _total_row = pd.DataFrame([{
@@ -4172,18 +4180,12 @@ with t_medellin:
     # ── Tabla 2: los 4 candidatos × grupo etario × comuna ────────────────────
     st.markdown("##### Grupo etario por comuna — los 4 candidatos")
 
-    # Asegurar pct_paloma y pct_fajardo en _seg_com_all
-    if "pct_paloma" not in _seg_com_all.columns:
-        _seg_com_all["pct_paloma"]  = (_seg_com_all["v_paloma"]  / _seg_com_all["total"] * 100).round(1)
-    if "pct_fajardo" not in _seg_com_all.columns:
-        _seg_com_all["pct_fajardo"] = (_seg_com_all["v_fajardo"] / _seg_com_all["total"] * 100).round(1)
-
     _seg_com_all["segmento"] = pd.Categorical(
         _seg_com_all["segmento"], categories=_SEG_ORDER, ordered=True
     )
 
-    # Construir tabla larga: fila = (comuna, grupo etario)
-    _seg_long = _seg_com_all.sort_values(["comuna_label","segmento"]).copy()
+    # Construir tabla larga: fila = (comuna, grupo etario), orden numérico de comunas
+    _seg_long = _seg_com_all.sort_values(["cod_comuna","segmento"]).copy()
     _seg_long = _seg_long.rename(columns={
         "comuna_label":"Comuna","segmento":"Grupo etario",
         "pct_ae":"% AE","pct_ic":"% IC","pct_paloma":"% Paloma","pct_fajardo":"% Fajardo",
