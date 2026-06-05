@@ -668,15 +668,6 @@ def load_medellin_data():
 
 _med_p_all, _med_m_all, _MED_COM_NAMES, _med_comunas_geo = load_medellin_data()
 
-# Centroides de comunas para labels en mapa
-_med_com_label_lats, _med_com_label_lons, _med_com_label_texts = [], [], []
-for _cf in _med_comunas_geo["features"]:
-    _cgeom = _cf["geometry"]
-    _cring = (_cgeom["coordinates"][0] if _cgeom["type"] == "Polygon"
-              else max(_cgeom["coordinates"], key=lambda p: len(p[0]))[0])
-    _med_com_label_lats.append(sum(c[1] for c in _cring) / len(_cring))
-    _med_com_label_lons.append(sum(c[0] for c in _cring) / len(_cring))
-    _med_com_label_texts.append(_cf["properties"].get("nombre", ""))
 
 
 @st.cache_data
@@ -3372,16 +3363,10 @@ with t_medellin:
             featureidkey="properties.codigo",
             colorscale=[[0, "rgba(0,0,0,0)"], [1, "rgba(0,0,0,0)"]],
             showscale=False,
-            marker=dict(line=dict(color="#C8A96E", width=2.5), opacity=1.0),
+            marker=dict(line=dict(color="#FFFFFF", width=2.0), opacity=1.0),
             text=_com_names,
             hovertemplate="%{text}<extra></extra>",
             name="Comunas",
-        ))
-        _fig_map.add_trace(go.Scattermapbox(
-            lat=_med_com_label_lats, lon=_med_com_label_lons,
-            mode="text", text=_med_com_label_texts,
-            textfont=dict(size=11, color="#7A5C20", family="IBM Plex Mono"),
-            hoverinfo="skip", showlegend=False, name="",
         ))
 
         # Trace 1: Abelardo gana → gradiente azul (claro → oscuro por % AE)
@@ -3403,8 +3388,8 @@ with t_medellin:
                         x=1.0,
                         thickness=12,
                         len=0.55,
-                        tickfont=dict(color="#444", size=10),
-                        title_font=dict(color="#444"),
+                        tickfont=dict(color="#DDD", size=10),
+                        title_font=dict(color="#DDD"),
                         ticksuffix="%",
                     ),
                     opacity=0.88,
@@ -3467,7 +3452,7 @@ with t_medellin:
 
         _fig_map.update_layout(
             mapbox=dict(
-                style="open-street-map",
+                style="carto-darkmatter",
                 zoom=_map_zoom,
                 center=_map_center,
             ),
@@ -3478,9 +3463,9 @@ with t_medellin:
                 orientation="h",
                 yanchor="bottom", y=0.02,
                 xanchor="left", x=0.02,
-                bgcolor="rgba(255,255,255,0.88)",
-                bordercolor="#C8A96E", borderwidth=1,
-                font=dict(color="#333333", size=11),
+                bgcolor="rgba(20,20,20,0.85)",
+                bordercolor="#555555", borderwidth=1,
+                font=dict(color="#DDDDDD", size=11),
             ),
         )
         _map_event = st.plotly_chart(
@@ -3912,7 +3897,7 @@ with t_medellin:
             featureidkey="properties.codigo",
             colorscale=[[0, "rgba(0,0,0,0)"], [1, "rgba(0,0,0,0)"]],
             showscale=False,
-            marker=dict(line=dict(color="#C8A96E", width=2.5), opacity=1.0),
+            marker=dict(line=dict(color="#FFFFFF", width=2.0), opacity=1.0),
             hoverinfo="skip", name="Comunas",
         ))
         _fig_ren.add_trace(go.Scattermapbox(
@@ -3926,8 +3911,8 @@ with t_medellin:
                 cmin=0, cmax=5,
                 colorbar=dict(
                     title="Ventaja pp", x=1.0, thickness=12, len=0.5,
-                    tickfont=dict(color="#333", size=10),
-                    title_font=dict(color="#333"),
+                    tickfont=dict(color="#DDD", size=10),
+                    title_font=dict(color="#DDD"),
                 ),
                 showscale=True,
             ),
@@ -3935,14 +3920,8 @@ with t_medellin:
             hovertemplate="%{text}<extra></extra>",
             name="Puestos reñidos",
         ))
-        _fig_ren.add_trace(go.Scattermapbox(
-            lat=_med_com_label_lats, lon=_med_com_label_lons,
-            mode="text", text=_med_com_label_texts,
-            textfont=dict(size=10, color="#7A5C20", family="IBM Plex Mono"),
-            hoverinfo="skip", showlegend=False, name="",
-        ))
         _fig_ren.update_layout(
-            mapbox=dict(style="open-street-map", zoom=10.5,
+            mapbox=dict(style="carto-darkmatter", zoom=10.5,
                         center={"lat": 6.247, "lon": -75.565}),
             height=530,
             margin=dict(l=0, r=0, t=0, b=0),
@@ -4300,13 +4279,13 @@ with t_medellin:
         zmin=40, zmax=75,
         colorbar=dict(
             title="% ADLE", x=1.0, thickness=14, len=0.6,
-            tickfont=dict(color="#333", size=11),
-            title_font=dict(color="#333"),
+            tickfont=dict(color="#DDD", size=11),
+            title_font=dict(color="#DDD"),
             ticksuffix="%",
         ),
         text=_geo_hover,
         hovertemplate="%{text}<extra></extra>",
-        marker=dict(line=dict(color="#C8A96E", width=2.5), opacity=0.88),
+        marker=dict(line=dict(color="#FFFFFF", width=2.0), opacity=0.88),
         name="Comunas",
     ))
 
@@ -4317,26 +4296,20 @@ with t_medellin:
     _fig_coro.add_trace(go.Scattermapbox(
         lat=_fp_map["lat"], lon=_fp_map["lon"],
         mode="markers", name="Puestos",
-        marker=dict(size=_fp_map["ms"], color="rgba(0,0,0,0.25)"),
+        marker=dict(size=_fp_map["ms"], color="rgba(255,255,255,0.35)"),
         hovertemplate="<b>%{text}</b><extra></extra>",
         text=_fp_map["puesto"],
     ))
-    _fig_coro.add_trace(go.Scattermapbox(
-        lat=_med_com_label_lats, lon=_med_com_label_lons,
-        mode="text", text=_med_com_label_texts,
-        textfont=dict(size=11, color="#7A5C20", family="IBM Plex Mono"),
-        hoverinfo="skip", showlegend=False, name="",
-    ))
 
     _fig_coro.update_layout(
-        mapbox=dict(style="open-street-map", zoom=10.5,
+        mapbox=dict(style="carto-darkmatter", zoom=10.5,
                     center={"lat": 6.247, "lon": -75.565}),
         height=600,
         margin=dict(l=0, r=0, t=0, b=0),
         paper_bgcolor="rgba(0,0,0,0)",
         legend=dict(orientation="h", yanchor="bottom", y=0.02, xanchor="left", x=0.02,
-                    bgcolor="rgba(255,255,255,0.88)", bordercolor="#C8A96E", borderwidth=1,
-                    font=dict(color="#333", size=11)),
+                    bgcolor="rgba(20,20,20,0.85)", bordercolor="#555", borderwidth=1,
+                    font=dict(color="#DDD", size=11)),
     )
     st.plotly_chart(_fig_coro, use_container_width=True,
                     config={"scrollZoom": True, "displayModeBar": False})
@@ -4372,7 +4345,7 @@ with t_medellin:
         featureidkey="properties.codigo",
         colorscale=[[0, "rgba(0,0,0,0)"], [1, "rgba(0,0,0,0)"]],
         showscale=False,
-        marker=dict(line=dict(color="#C8A96E", width=2.5), opacity=1.0),
+        marker=dict(line=dict(color="#FFFFFF", width=2.0), opacity=1.0),
         hoverinfo="skip", name="Comunas",
     ))
     _fig_coal_map.add_trace(go.Scattermapbox(
@@ -4390,8 +4363,8 @@ with t_medellin:
             cmin=35, cmax=70,
             colorbar=dict(
                 title="% Coalición", x=1.0, thickness=14, len=0.6,
-                tickfont=dict(color="#333", size=11),
-                title_font=dict(color="#333"),
+                tickfont=dict(color="#DDD", size=11),
+                title_font=dict(color="#DDD"),
                 ticksuffix="%",
             ),
             opacity=0.88,
@@ -4400,14 +4373,8 @@ with t_medellin:
         hovertemplate="%{text}<extra></extra>",
         name="Puestos",
     ))
-    _fig_coal_map.add_trace(go.Scattermapbox(
-        lat=_med_com_label_lats, lon=_med_com_label_lons,
-        mode="text", text=_med_com_label_texts,
-        textfont=dict(size=11, color="#7A5C20", family="IBM Plex Mono"),
-        hoverinfo="skip", showlegend=False, name="",
-    ))
     _fig_coal_map.update_layout(
-        mapbox=dict(style="open-street-map", zoom=10.5,
+        mapbox=dict(style="carto-darkmatter", zoom=10.5,
                     center={"lat": 6.247, "lon": -75.565}),
         height=600,
         margin=dict(l=0, r=0, t=0, b=0),
@@ -4832,7 +4799,7 @@ with t_amva:
             featureidkey="properties.codigo",
             colorscale=[[0,"rgba(0,0,0,0)"],[1,"rgba(0,0,0,0)"]],
             showscale=False,
-            marker=dict(line=dict(color="#C8A96E", width=2.5), opacity=1.0),
+            marker=dict(line=dict(color="#FFFFFF", width=2.0), opacity=1.0),
             hoverinfo="skip", name="Comunas",
         ))
 
@@ -4848,8 +4815,8 @@ with t_amva:
                     colorscale=[[0,"#a8d4f5"],[0.5,"#4A90C0"],[1,"#003880"]],
                     cmin=40, cmax=82, showscale=True,
                     colorbar=dict(title="% ADLE", x=1.0, thickness=12, len=0.5,
-                                  tickfont=dict(color="#444",size=10),
-                                  title_font=dict(color="#444"), ticksuffix="%"),
+                                  tickfont=dict(color="#DDD",size=10),
+                                  title_font=dict(color="#DDD"), ticksuffix="%"),
                     opacity=0.88,
                 ),
                 text=_av_map_ae["_ht"], hoverinfo="text",
@@ -4887,21 +4854,14 @@ with t_amva:
             _avm_center = {"lat": 6.23, "lon": -75.59}
             _avm_zoom   = 10
 
-        _fig_avm.add_trace(go.Scattermapbox(
-            lat=_med_com_label_lats, lon=_med_com_label_lons,
-            mode="text", text=_med_com_label_texts,
-            textfont=dict(size=11, color="#7A5C20", family="IBM Plex Mono"),
-            hoverinfo="skip", showlegend=False, name="",
-        ))
-
         _fig_avm.update_layout(
-            mapbox=dict(style="open-street-map", zoom=_avm_zoom, center=_avm_center),
+            mapbox=dict(style="carto-darkmatter", zoom=_avm_zoom, center=_avm_center),
             height=540,
             margin=dict(l=0,r=0,t=0,b=0),
             paper_bgcolor="rgba(0,0,0,0)",
             legend=dict(orientation="h", yanchor="bottom", y=0.02, xanchor="left", x=0.02,
-                        bgcolor="rgba(255,255,255,0.88)", bordercolor="#C8A96E", borderwidth=1,
-                        font=dict(color="#333",size=11)),
+                        bgcolor="rgba(20,20,20,0.85)", bordercolor="#555", borderwidth=1,
+                        font=dict(color="#DDD",size=11)),
         )
         _av_mev = st.plotly_chart(
             _fig_avm, use_container_width=True,
@@ -5311,7 +5271,7 @@ with t_amva:
         featureidkey="properties.codigo",
         colorscale=[[0, "rgba(0,0,0,0)"], [1, "rgba(0,0,0,0)"]],
         showscale=False,
-        marker=dict(line=dict(color="#C8A96E", width=2.5), opacity=1.0),
+        marker=dict(line=dict(color="#FFFFFF", width=2.0), opacity=1.0),
         hoverinfo="skip", name="Comunas",
     ))
     _fig_av_coal.add_trace(go.Scattermapbox(
@@ -5322,20 +5282,14 @@ with t_amva:
             colorscale=[[0.0,"#C0141C"],[0.5,"#F5F5F5"],[1.0,"#1565C0"]],
             cmin=35, cmax=70,
             colorbar=dict(title="% Coalición", x=1.0, thickness=14, len=0.6,
-                          tickfont=dict(color="#333",size=11),
-                          title_font=dict(color="#333"), ticksuffix="%"),
+                          tickfont=dict(color="#DDD",size=11),
+                          title_font=dict(color="#DDD"), ticksuffix="%"),
             opacity=0.88,
         ),
         text=_av_coal["hover"], hovertemplate="%{text}<extra></extra>",
     ))
-    _fig_av_coal.add_trace(go.Scattermapbox(
-        lat=_med_com_label_lats, lon=_med_com_label_lons,
-        mode="text", text=_med_com_label_texts,
-        textfont=dict(size=11, color="#7A5C20", family="IBM Plex Mono"),
-        hoverinfo="skip", showlegend=False, name="",
-    ))
     _fig_av_coal.update_layout(
-        mapbox=dict(style="open-street-map", zoom=10, center={"lat":6.23,"lon":-75.59}),
+        mapbox=dict(style="carto-darkmatter", zoom=10, center={"lat":6.23,"lon":-75.59}),
         height=600, margin=dict(l=0,r=0,t=0,b=0), paper_bgcolor="rgba(0,0,0,0)",
     )
     st.plotly_chart(_fig_av_coal, use_container_width=True,
