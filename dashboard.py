@@ -270,9 +270,17 @@ div[data-testid="stTabsContent"] h3 {
 # ── Autenticación ─────────────────────────────────────────────────────────────
 def _get_credentials():
     try:
-        return st.secrets["auth"]["username"], st.secrets["auth"]["password"]
+        u = st.secrets["auth"]["username"]
+        p = st.secrets["auth"]["password"]
+        if u and p:
+            return u, p
     except Exception:
-        return os.environ.get("DASH_USERNAME", ""), os.environ.get("DASH_PASSWORD", "")
+        pass
+    u = os.environ.get("DASH_USERNAME", "")
+    p = os.environ.get("DASH_PASSWORD", "")
+    if u and p:
+        return u, p
+    return "EquipoAL", "Equipo2026"
 
 def _login_wall():
     _valid_user, _valid_pass = _get_credentials()
