@@ -4391,6 +4391,79 @@ with t_medellin:
 
     st.divider()
 
+    # ── Distribución de voto por comuna — todos los candidatos ────────────────
+    st.markdown("##### Distribución de voto por comuna — todos los candidatos")
+
+    _ALL_CANDS_MED = [
+        ("v_abelardo_de_la_espriella", "Abelardo",  "#4A90C0"),
+        ("v_ivan_cepeda",              "Cepeda",     "#CC0000"),
+        ("v_paloma_valencia",          "Paloma",     "#4CAF50"),
+        ("v_sergio_fajardo",           "Fajardo",    "#FF8C00"),
+        ("v_miguel_uribe_londoño",     "Uribe L.",   "#9B59B6"),
+        ("v_claudia_lopez",            "C. López",   "#8E44AD"),
+        ("v_gustavo_matamoros",        "Matamoros",  "#1ABC9C"),
+        ("v_roy_barrera",              "Barrera",    "#E67E22"),
+        ("v_santiago_botero",          "Botero",     "#E74C3C"),
+        ("v_luis_gilberto_murillo",    "Murillo",    "#27AE60"),
+        ("v_carlos_caicedo",           "Caicedo",    "#D35400"),
+        ("v_sondra_maconllis",         "Maconllis",  "#2C3E50"),
+        ("v_oscar_mauricio_lizcano",   "Lizcano",    "#7F8C8D"),
+    ]
+
+    _agg_dict = {"validos": ("total_validos", "sum")}
+    for _col, _lbl, _ in _ALL_CANDS_MED:
+        _agg_dict[_col] = (_col, "sum")
+
+    _com_all = (
+        _med_p_all[_med_p_all["cod_comune"] != 0]
+        .groupby(["cod_comune","comuna_label"])
+        .agg(**_agg_dict)
+        .reset_index()
+        .sort_values("cod_comune")
+    )
+    for _col, _, _ in _ALL_CANDS_MED:
+        _com_all[f"pct_{_col}"] = (_com_all[_col] / _com_all["validos"] * 100).round(1)
+
+    # ── Gráfico apilado 100% ──────────────────────────────────────────────────
+    _fig_com_all = go.Figure()
+    for _col, _lbl, _clr in _ALL_CANDS_MED:
+        _pct_col = f"pct_{_col}"
+        _v = _com_all[_pct_col]
+        _fig_com_all.add_trace(go.Bar(
+            name=_lbl,
+            x=_com_all["comuna_label"],
+            y=_v,
+            marker_color=_clr,
+            text=_v.map(lambda v: f"{v:.1f}%" if v >= 2.5 else ""),
+            textposition="inside", insidetextanchor="middle",
+            textfont=dict(color="white", size=10, family="IBM Plex Mono"),
+            hovertemplate=f"<b>%{{x}}</b><br>{_lbl}: %{{y:.1f}}%<extra></extra>",
+        ))
+    _fig_com_all.update_layout(
+        barmode="stack", height=500,
+        margin=dict(l=0, r=0, t=10, b=0),
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#0A0A0A",
+        xaxis=dict(tickangle=-40, tickfont=dict(color="#F0EDE8", size=9),
+                   gridcolor="rgba(0,0,0,0)"),
+        yaxis=dict(ticksuffix="%", range=[0, 100], gridcolor="#1E1E1E",
+                   tickfont=dict(color="#9A9A90")),
+        legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="left", x=0,
+                    font=dict(color="#9A9A90", size=10), bgcolor="rgba(0,0,0,0)",
+                    traceorder="normal"),
+    )
+    st.plotly_chart(_fig_com_all, use_container_width=True, config={"displayModeBar": False})
+
+    # ── Tabla completa todos los candidatos ───────────────────────────────────
+    _tbl_all = _com_all[["comuna_label","validos"]].copy()
+    _tbl_all.rename(columns={"comuna_label":"Comuna","validos":"Válidos"}, inplace=True)
+    for _col, _lbl, _ in _ALL_CANDS_MED:
+        _tbl_all[f"% {_lbl}"] = _com_all[f"pct_{_col}"].apply(lambda v: f"{v:.1f}%")
+    _tbl_all["Válidos"] = _tbl_all["Válidos"].apply(lambda v: f"{int(v):,}")
+    _tbl_all = _tbl_all.reset_index(drop=True)
+    st.dataframe(_tbl_all, use_container_width=True, hide_index=True, height=560)
+
+    st.divider()
+
     # ── Tabla 1: resumen general por comuna ───────────────────────────────────
     _com_resumen = (
         _med_p_all.groupby(["cod_comune","comuna_label"])
