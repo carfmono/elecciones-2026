@@ -2687,6 +2687,17 @@ with t_antioquia:
 
             _fig_anpm = go.Figure()
 
+            _fig_anpm.add_trace(go.Choroplethmapbox(
+                geojson=geo_ant,
+                locations=[f["properties"]["MPIO_CCNCT"] for f in geo_ant["features"]],
+                z=[0] * len(geo_ant["features"]),
+                featureidkey="properties.MPIO_CCNCT",
+                colorscale=[[0, "rgba(0,0,0,0)"], [1, "rgba(0,0,0,0)"]],
+                showscale=False,
+                marker=dict(line=dict(color="#FFFFFF", width=1.0), opacity=1.0),
+                hoverinfo="skip", name="Municipios",
+            ))
+
             if len(_anp_map_ae):
                 _anp_map_ae["_ht"] = _anp_map_ae.apply(_anp_htxt, axis=1)
                 _fig_anpm.add_trace(go.Scattermapbox(
@@ -2699,8 +2710,8 @@ with t_antioquia:
                         colorscale=[[0,"#a8d4f5"],[0.5,"#4A90C0"],[1,"#003880"]],
                         cmin=40, cmax=82, showscale=True,
                         colorbar=dict(title="% ADLE", x=1.0, thickness=12, len=0.5,
-                                      tickfont=dict(color="#444",size=10),
-                                      title_font=dict(color="#444"), ticksuffix="%"),
+                                      tickfont=dict(color="#DDD",size=10),
+                                      title_font=dict(color="#DDD"), ticksuffix="%"),
                         opacity=0.88,
                     ),
                     text=_anp_map_ae["_ht"], hoverinfo="text",
@@ -2739,13 +2750,13 @@ with t_antioquia:
                 _anpm_zoom   = 7
 
             _fig_anpm.update_layout(
-                mapbox=dict(style="carto-positron", zoom=_anpm_zoom, center=_anpm_center),
+                mapbox=dict(style="carto-darkmatter", zoom=_anpm_zoom, center=_anpm_center),
                 height=540,
                 margin=dict(l=0,r=0,t=0,b=0),
                 paper_bgcolor="rgba(0,0,0,0)",
                 legend=dict(orientation="h", yanchor="bottom", y=0.02, xanchor="left", x=0.02,
-                            bgcolor="rgba(255,255,255,0.85)", bordercolor="#ccc", borderwidth=1,
-                            font=dict(color="#333",size=11)),
+                            bgcolor="rgba(20,20,20,0.85)", bordercolor="#555", borderwidth=1,
+                            font=dict(color="#DDD",size=11)),
             )
             _anp_mev = st.plotly_chart(
                 _fig_anpm, use_container_width=True,
@@ -3118,7 +3129,18 @@ with t_antioquia:
             + "Municipio: " + _ant_coal["municipio"] + "<br>"
             + "Votos totales: " + _ant_coal["total_validos"].map(lambda x: f"{int(x):,}")
         )
-        _fig_ant_coal = go.Figure(go.Scattermapbox(
+        _fig_ant_coal = go.Figure()
+        _fig_ant_coal.add_trace(go.Choroplethmapbox(
+            geojson=geo_ant,
+            locations=[f["properties"]["MPIO_CCNCT"] for f in geo_ant["features"]],
+            z=[0] * len(geo_ant["features"]),
+            featureidkey="properties.MPIO_CCNCT",
+            colorscale=[[0, "rgba(0,0,0,0)"], [1, "rgba(0,0,0,0)"]],
+            showscale=False,
+            marker=dict(line=dict(color="#FFFFFF", width=1.0), opacity=1.0),
+            hoverinfo="skip", name="Municipios",
+        ))
+        _fig_ant_coal.add_trace(go.Scattermapbox(
             lat=_ant_coal["lat"], lon=_ant_coal["lon"],
             mode="markers",
             marker=go.scattermapbox.Marker(
@@ -3126,14 +3148,14 @@ with t_antioquia:
                 colorscale=[[0.0,"#C0141C"],[0.5,"#F5F5F5"],[1.0,"#1565C0"]],
                 cmin=35, cmax=70,
                 colorbar=dict(title="% Coalición", x=1.0, thickness=14, len=0.6,
-                              tickfont=dict(color="#333",size=11),
-                              title_font=dict(color="#333"), ticksuffix="%"),
+                              tickfont=dict(color="#DDD",size=11),
+                              title_font=dict(color="#DDD"), ticksuffix="%"),
                 opacity=0.88,
             ),
             text=_ant_coal["hover"], hovertemplate="%{text}<extra></extra>",
         ))
         _fig_ant_coal.update_layout(
-            mapbox=dict(style="carto-positron", zoom=7, center={"lat":6.70,"lon":-75.50}),
+            mapbox=dict(style="carto-darkmatter", zoom=7, center={"lat":6.70,"lon":-75.50}),
             height=600, margin=dict(l=0,r=0,t=0,b=0), paper_bgcolor="rgba(0,0,0,0)",
         )
         st.plotly_chart(_fig_ant_coal, use_container_width=True,
