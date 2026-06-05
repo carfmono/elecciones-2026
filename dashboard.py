@@ -3361,9 +3361,9 @@ with t_medellin:
             locations=_com_ids,
             z=[0] * len(_com_ids),
             featureidkey="properties.codigo",
-            colorscale=[[0, "rgba(200,200,200,0.15)"], [1, "rgba(200,200,200,0.15)"]],
+            colorscale=[[0, "rgba(0,0,0,0)"], [1, "rgba(0,0,0,0)"]],
             showscale=False,
-            marker=dict(line=dict(color="#888888", width=1.2), opacity=0.5),
+            marker=dict(line=dict(color="#FFFFFF", width=2.0), opacity=1.0),
             text=_com_names,
             hovertemplate="%{text}<extra></extra>",
             name="Comunas",
@@ -3388,8 +3388,8 @@ with t_medellin:
                         x=1.0,
                         thickness=12,
                         len=0.55,
-                        tickfont=dict(color="#444", size=10),
-                        title_font=dict(color="#444"),
+                        tickfont=dict(color="#DDD", size=10),
+                        title_font=dict(color="#DDD"),
                         ticksuffix="%",
                     ),
                     opacity=0.88,
@@ -3452,7 +3452,7 @@ with t_medellin:
 
         _fig_map.update_layout(
             mapbox=dict(
-                style="carto-positron",
+                style="carto-darkmatter",
                 zoom=_map_zoom,
                 center=_map_center,
             ),
@@ -3463,9 +3463,9 @@ with t_medellin:
                 orientation="h",
                 yanchor="bottom", y=0.02,
                 xanchor="left", x=0.02,
-                bgcolor="rgba(255,255,255,0.85)",
-                bordercolor="#cccccc", borderwidth=1,
-                font=dict(color="#333333", size=11),
+                bgcolor="rgba(20,20,20,0.85)",
+                bordercolor="#555555", borderwidth=1,
+                font=dict(color="#DDDDDD", size=11),
             ),
         )
         _map_event = st.plotly_chart(
@@ -3889,7 +3889,18 @@ with t_medellin:
         _ren_map["size"] = (_ren_map["total_validos"] / _ren_map["total_validos"].max() * 16 + 8).clip(8, 24)
         _ren_map["color_val"] = _ren_map["dif_ae_ic"]
 
-        _fig_ren = go.Figure(go.Scattermapbox(
+        _fig_ren = go.Figure()
+        _fig_ren.add_trace(go.Choroplethmapbox(
+            geojson=_med_comunas_geo,
+            locations=[f["properties"]["codigo"] for f in _med_comunas_geo["features"]],
+            z=[0] * len(_med_comunas_geo["features"]),
+            featureidkey="properties.codigo",
+            colorscale=[[0, "rgba(0,0,0,0)"], [1, "rgba(0,0,0,0)"]],
+            showscale=False,
+            marker=dict(line=dict(color="#FFFFFF", width=2.0), opacity=1.0),
+            hoverinfo="skip", name="Comunas",
+        ))
+        _fig_ren.add_trace(go.Scattermapbox(
             lat=_ren_map["lat"],
             lon=_ren_map["lon"],
             mode="markers",
@@ -3900,8 +3911,8 @@ with t_medellin:
                 cmin=0, cmax=5,
                 colorbar=dict(
                     title="Ventaja pp", x=1.0, thickness=12, len=0.5,
-                    tickfont=dict(color="#333", size=10),
-                    title_font=dict(color="#333"),
+                    tickfont=dict(color="#DDD", size=10),
+                    title_font=dict(color="#DDD"),
                 ),
                 showscale=True,
             ),
@@ -3910,7 +3921,7 @@ with t_medellin:
             name="Puestos reñidos",
         ))
         _fig_ren.update_layout(
-            mapbox=dict(style="carto-positron", zoom=10.5,
+            mapbox=dict(style="carto-darkmatter", zoom=10.5,
                         center={"lat": 6.247, "lon": -75.565}),
             height=530,
             margin=dict(l=0, r=0, t=0, b=0),
@@ -4268,13 +4279,13 @@ with t_medellin:
         zmin=40, zmax=75,
         colorbar=dict(
             title="% ADLE", x=1.0, thickness=14, len=0.6,
-            tickfont=dict(color="#333", size=11),
-            title_font=dict(color="#333"),
+            tickfont=dict(color="#DDD", size=11),
+            title_font=dict(color="#DDD"),
             ticksuffix="%",
         ),
         text=_geo_hover,
         hovertemplate="%{text}<extra></extra>",
-        marker=dict(line=dict(color="#FFFFFF", width=1.2), opacity=0.88),
+        marker=dict(line=dict(color="#FFFFFF", width=2.0), opacity=0.88),
         name="Comunas",
     ))
 
@@ -4291,14 +4302,14 @@ with t_medellin:
     ))
 
     _fig_coro.update_layout(
-        mapbox=dict(style="carto-positron", zoom=10.5,
+        mapbox=dict(style="carto-darkmatter", zoom=10.5,
                     center={"lat": 6.247, "lon": -75.565}),
         height=600,
         margin=dict(l=0, r=0, t=0, b=0),
         paper_bgcolor="rgba(0,0,0,0)",
         legend=dict(orientation="h", yanchor="bottom", y=0.02, xanchor="left", x=0.02,
-                    bgcolor="rgba(255,255,255,0.85)", bordercolor="#ccc", borderwidth=1,
-                    font=dict(color="#333", size=11)),
+                    bgcolor="rgba(20,20,20,0.85)", bordercolor="#555", borderwidth=1,
+                    font=dict(color="#DDD", size=11)),
     )
     st.plotly_chart(_fig_coro, use_container_width=True,
                     config={"scrollZoom": True, "displayModeBar": False})
@@ -4326,7 +4337,18 @@ with t_medellin:
         + "Votos totales: " + _fp_coal["total_validos"].map(lambda x: f"{int(x):,}")
     )
 
-    _fig_coal_map = go.Figure(go.Scattermapbox(
+    _fig_coal_map = go.Figure()
+    _fig_coal_map.add_trace(go.Choroplethmapbox(
+        geojson=_med_comunas_geo,
+        locations=[f["properties"]["codigo"] for f in _med_comunas_geo["features"]],
+        z=[0] * len(_med_comunas_geo["features"]),
+        featureidkey="properties.codigo",
+        colorscale=[[0, "rgba(0,0,0,0)"], [1, "rgba(0,0,0,0)"]],
+        showscale=False,
+        marker=dict(line=dict(color="#FFFFFF", width=2.0), opacity=1.0),
+        hoverinfo="skip", name="Comunas",
+    ))
+    _fig_coal_map.add_trace(go.Scattermapbox(
         lat=_fp_coal["lat"],
         lon=_fp_coal["lon"],
         mode="markers",
@@ -4341,8 +4363,8 @@ with t_medellin:
             cmin=35, cmax=70,
             colorbar=dict(
                 title="% Coalición", x=1.0, thickness=14, len=0.6,
-                tickfont=dict(color="#333", size=11),
-                title_font=dict(color="#333"),
+                tickfont=dict(color="#DDD", size=11),
+                title_font=dict(color="#DDD"),
                 ticksuffix="%",
             ),
             opacity=0.88,
@@ -4352,7 +4374,7 @@ with t_medellin:
         name="Puestos",
     ))
     _fig_coal_map.update_layout(
-        mapbox=dict(style="carto-positron", zoom=10.5,
+        mapbox=dict(style="carto-darkmatter", zoom=10.5,
                     center={"lat": 6.247, "lon": -75.565}),
         height=600,
         margin=dict(l=0, r=0, t=0, b=0),
@@ -4775,9 +4797,9 @@ with t_amva:
             locations=[f["properties"]["codigo"] for f in _med_comunas_geo["features"]],
             z=[0] * len(_med_comunas_geo["features"]),
             featureidkey="properties.codigo",
-            colorscale=[[0,"rgba(180,180,180,0.12)"],[1,"rgba(180,180,180,0.12)"]],
+            colorscale=[[0,"rgba(0,0,0,0)"],[1,"rgba(0,0,0,0)"]],
             showscale=False,
-            marker=dict(line=dict(color="#aaaaaa", width=0.8), opacity=0.4),
+            marker=dict(line=dict(color="#FFFFFF", width=2.0), opacity=1.0),
             hoverinfo="skip", name="Comunas",
         ))
 
@@ -4793,8 +4815,8 @@ with t_amva:
                     colorscale=[[0,"#a8d4f5"],[0.5,"#4A90C0"],[1,"#003880"]],
                     cmin=40, cmax=82, showscale=True,
                     colorbar=dict(title="% ADLE", x=1.0, thickness=12, len=0.5,
-                                  tickfont=dict(color="#444",size=10),
-                                  title_font=dict(color="#444"), ticksuffix="%"),
+                                  tickfont=dict(color="#DDD",size=10),
+                                  title_font=dict(color="#DDD"), ticksuffix="%"),
                     opacity=0.88,
                 ),
                 text=_av_map_ae["_ht"], hoverinfo="text",
@@ -4833,13 +4855,13 @@ with t_amva:
             _avm_zoom   = 10
 
         _fig_avm.update_layout(
-            mapbox=dict(style="carto-positron", zoom=_avm_zoom, center=_avm_center),
+            mapbox=dict(style="carto-darkmatter", zoom=_avm_zoom, center=_avm_center),
             height=540,
             margin=dict(l=0,r=0,t=0,b=0),
             paper_bgcolor="rgba(0,0,0,0)",
             legend=dict(orientation="h", yanchor="bottom", y=0.02, xanchor="left", x=0.02,
-                        bgcolor="rgba(255,255,255,0.85)", bordercolor="#ccc", borderwidth=1,
-                        font=dict(color="#333",size=11)),
+                        bgcolor="rgba(20,20,20,0.85)", bordercolor="#555", borderwidth=1,
+                        font=dict(color="#DDD",size=11)),
         )
         _av_mev = st.plotly_chart(
             _fig_avm, use_container_width=True,
@@ -5241,7 +5263,18 @@ with t_amva:
         + "Municipio: " + _av_coal["municipio"] + "<br>"
         + "Votos totales: " + _av_coal["total_validos"].map(lambda x: f"{int(x):,}")
     )
-    _fig_av_coal = go.Figure(go.Scattermapbox(
+    _fig_av_coal = go.Figure()
+    _fig_av_coal.add_trace(go.Choroplethmapbox(
+        geojson=_med_comunas_geo,
+        locations=[f["properties"]["codigo"] for f in _med_comunas_geo["features"]],
+        z=[0] * len(_med_comunas_geo["features"]),
+        featureidkey="properties.codigo",
+        colorscale=[[0, "rgba(0,0,0,0)"], [1, "rgba(0,0,0,0)"]],
+        showscale=False,
+        marker=dict(line=dict(color="#FFFFFF", width=2.0), opacity=1.0),
+        hoverinfo="skip", name="Comunas",
+    ))
+    _fig_av_coal.add_trace(go.Scattermapbox(
         lat=_av_coal["lat"], lon=_av_coal["lon"],
         mode="markers",
         marker=go.scattermapbox.Marker(
@@ -5249,14 +5282,14 @@ with t_amva:
             colorscale=[[0.0,"#C0141C"],[0.5,"#F5F5F5"],[1.0,"#1565C0"]],
             cmin=35, cmax=70,
             colorbar=dict(title="% Coalición", x=1.0, thickness=14, len=0.6,
-                          tickfont=dict(color="#333",size=11),
-                          title_font=dict(color="#333"), ticksuffix="%"),
+                          tickfont=dict(color="#DDD",size=11),
+                          title_font=dict(color="#DDD"), ticksuffix="%"),
             opacity=0.88,
         ),
         text=_av_coal["hover"], hovertemplate="%{text}<extra></extra>",
     ))
     _fig_av_coal.update_layout(
-        mapbox=dict(style="carto-positron", zoom=10, center={"lat":6.23,"lon":-75.59}),
+        mapbox=dict(style="carto-darkmatter", zoom=10, center={"lat":6.23,"lon":-75.59}),
         height=600, margin=dict(l=0,r=0,t=0,b=0), paper_bgcolor="rgba(0,0,0,0)",
     )
     st.plotly_chart(_fig_av_coal, use_container_width=True,
