@@ -3840,6 +3840,86 @@ with t_medellin:
 
     st.divider()
 
+    # ── Puestos reñidos: AE ganó por margen estrecho ──────────────────────────
+    st.subheader("Puestos en riesgo — ganados por Abelardo con margen estrecho")
+    st.caption("Puestos donde Abelardo venció a Cepeda pero por un margen ajustado. Prioridad de trabajo para segunda vuelta.")
+
+    _ren_umbral = st.radio(
+        "Umbral de diferencia", ["< 5 pp", "< 10 pp"],
+        horizontal=True, key="ren_umbral"
+    )
+    _ren_limite = 5.0 if _ren_umbral == "< 5 pp" else 10.0
+
+    _renidos = _perf_df[
+        (_perf_df["semaforo"] == "verde") &
+        ((_perf_df["pct_abelardo"] - _perf_df["v_ivan_cepeda_pct"]) < _ren_limite)
+    ].copy()
+    _renidos["dif_ae_ic"] = (_renidos["pct_abelardo"] - _renidos["v_ivan_cepeda_pct"]).round(2)
+    _renidos = _renidos.sort_values("dif_ae_ic")
+
+    _ren_c1, _ren_c2 = st.columns([1, 1], gap="large")
+
+    with _ren_c1:
+        st.markdown(f"**{len(_renidos)} puestos** — total votos en juego: **{int(_renidos['total_validos'].sum()):,}**")
+        _ren_tbl = _renidos[[
+            "puesto", "comuna_label", "pct_abelardo", "v_ivan_cepeda_pct",
+            "dif_ae_ic", "pct_paloma", "pct_fajardo", "total_validos"
+        ]].rename(columns={
+            "puesto": "Puesto", "comuna_label": "Comuna",
+            "pct_abelardo": "% AE", "v_ivan_cepeda_pct": "% IC",
+            "dif_ae_ic": "Ventaja AE",
+            "pct_paloma": "% Paloma", "pct_fajardo": "% Fajardo",
+            "total_validos": "Válidos",
+        }).reset_index(drop=True)
+        for _c in ["% AE", "% IC", "% Paloma", "% Fajardo"]:
+            _ren_tbl[_c] = _ren_tbl[_c].apply(lambda v: f"{v:.1f}%")
+        _ren_tbl["Ventaja AE"] = _ren_tbl["Ventaja AE"].apply(lambda v: f"+{v:.2f}pp")
+        _ren_tbl["Válidos"] = _ren_tbl["Válidos"].apply(lambda v: f"{int(v):,}")
+        st.dataframe(_ren_tbl, use_container_width=True, hide_index=True, height=530)
+
+    with _ren_c2:
+        _ren_map = _renidos.dropna(subset=["lat", "lon"]).copy()
+        _ren_map["hover"] = (
+            "<b>" + _ren_map["puesto"] + "</b><br>"
+            + "AE: " + _ren_map["pct_abelardo"].map(lambda v: f"{v:.1f}%")
+            + " · IC: " + _ren_map["v_ivan_cepeda_pct"].map(lambda v: f"{v:.1f}%") + "<br>"
+            + "Ventaja: +" + _ren_map["dif_ae_ic"].map(lambda v: f"{v:.2f}pp") + "<br>"
+            + "Válidos: " + _ren_map["total_validos"].map(lambda v: f"{int(v):,}")
+        )
+        _ren_map["size"] = (_ren_map["total_validos"] / _ren_map["total_validos"].max() * 16 + 8).clip(8, 24)
+        _ren_map["color_val"] = _ren_map["dif_ae_ic"]
+
+        _fig_ren = go.Figure(go.Scattermapbox(
+            lat=_ren_map["lat"],
+            lon=_ren_map["lon"],
+            mode="markers",
+            marker=go.scattermapbox.Marker(
+                size=_ren_map["size"],
+                color=_ren_map["color_val"],
+                colorscale=[[0, "#FF4444"], [0.5, "#FFAA00"], [1.0, "#44CC44"]],
+                cmin=0, cmax=5,
+                colorbar=dict(
+                    title="Ventaja pp", x=1.0, thickness=12, len=0.5,
+                    tickfont=dict(color="#333", size=10),
+                    title_font=dict(color="#333"),
+                ),
+                showscale=True,
+            ),
+            text=_ren_map["hover"],
+            hovertemplate="%{text}<extra></extra>",
+            name="Puestos reñidos",
+        ))
+        _fig_ren.update_layout(
+            mapbox=dict(style="carto-positron", zoom=10.5,
+                        center={"lat": 6.247, "lon": -75.565}),
+            height=530,
+            margin=dict(l=0, r=0, t=0, b=0),
+            paper_bgcolor="rgba(0,0,0,0)",
+        )
+        st.plotly_chart(_fig_ren, use_container_width=True, config={"displayModeBar": False})
+
+    st.divider()
+
     # ── Puestos con mayor votación: Paloma y Fajardo ──────────────────────────
     st.subheader("Puestos con mayor votación — Paloma Valencia y Sergio Fajardo")
 
