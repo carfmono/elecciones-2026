@@ -2707,7 +2707,7 @@ with t_antioquia:
                     marker=dict(
                         size=_anp_map_ae["msize"],
                         color=_anp_map_ae["pct_abelardo"],
-                        colorscale=[[0,"#4A90C0"],[0.5,"#1a5fa8"],[1,"#003880"]],
+                        colorscale=[[0,"#2196F3"],[0.5,"#1565C0"],[1,"#003880"]],
                         cmin=40, cmax=82, showscale=True,
                         colorbar=dict(title="% ADLE", x=1.0, thickness=12, len=0.5,
                                       tickfont=dict(color="#DDD",size=10),
@@ -3411,7 +3411,7 @@ with t_medellin:
                 marker=dict(
                     size=_map_ae["marker_size"],
                     color=_map_ae["pct_abelardo"],
-                    colorscale=[[0, "#4A90C0"], [0.5, "#1a5fa8"], [1, "#003880"]],
+                    colorscale=[[0, "#2196F3"], [0.5, "#1565C0"], [1, "#003880"]],
                     cmin=40, cmax=82,
                     showscale=True,
                     colorbar=dict(
@@ -4311,7 +4311,7 @@ with t_medellin:
         locations=_geo_codes,
         z=_geo_pct_ae,
         featureidkey="properties.codigo",
-        colorscale=[[0,"#4A90C0"],[0.4,"#1a5fa8"],[0.7,"#0d4a8a"],[1,"#003880"]],
+        colorscale=[[0,"#2196F3"],[0.4,"#1565C0"],[0.7,"#0d3e8a"],[1,"#003880"]],
         zmin=40, zmax=75,
         colorbar=dict(
             title="% ADLE", x=1.0, thickness=14, len=0.6,
@@ -4848,7 +4848,7 @@ with t_amva:
                 marker=dict(
                     size=_av_map_ae["msize"],
                     color=_av_map_ae["pct_abelardo"],
-                    colorscale=[[0,"#4A90C0"],[0.5,"#1a5fa8"],[1,"#003880"]],
+                    colorscale=[[0,"#2196F3"],[0.5,"#1565C0"],[1,"#003880"]],
                     cmin=40, cmax=82, showscale=True,
                     colorbar=dict(title="% ADLE", x=1.0, thickness=12, len=0.5,
                                   tickfont=dict(color="#DDD",size=10),
