@@ -2718,15 +2718,24 @@ with t_antioquia:
                 ))
 
             if len(_anp_map_ic):
+                _anp_map_ic["pct_cepeda"] = (_anp_map_ic["v_ivan_cepeda"] / _anp_map_ic["total_validos"] * 100).round(1)
                 _anp_map_ic["_ht_ic"] = _anp_map_ic.apply(
                     lambda r: (f"<b>{r['puesto']}</b><br>{r['municipio']}<br>"
-                               f"AE 2° — {r['pct_abelardo']:.1f}%<br>"
+                               f"Cepeda 1° — {r['pct_cepeda']:.1f}%<br>"
+                               f"AE: {r['pct_abelardo']:.1f}%<br>"
                                f"Votos totales: {int(r['total_validos']):,}"), axis=1)
                 _fig_anpm.add_trace(go.Scattermapbox(
                     lat=_anp_map_ic["lat"], lon=_anp_map_ic["lon"],
                     mode="markers", name="Cepeda 1°",
                     customdata=_anp_map_ic["puesto"].values,
-                    marker=dict(size=_anp_map_ic["msize"], color="#CC0000", opacity=0.88),
+                    marker=dict(
+                        size=_anp_map_ic["msize"],
+                        color=_anp_map_ic["pct_cepeda"],
+                        colorscale=[[0, "#FF8080"], [0.5, "#CC0000"], [1, "#7B0000"]],
+                        cmin=30, cmax=70,
+                        showscale=False,
+                        opacity=0.88,
+                    ),
                     text=_anp_map_ic["_ht_ic"], hoverinfo="text",
                 ))
 
@@ -3420,12 +3429,14 @@ with t_medellin:
                 hoverinfo="text",
             ))
 
-        # Trace 2: Cepeda/otros ganan → rojo
+        # Trace 2: Cepeda/otros ganan → rojo con gradiente
         if len(_map_ic):
+            _map_ic["pct_cepeda"] = (_map_ic["v_ivan_cepeda"] / _map_ic["total_validos"] * 100).round(1)
             _map_ic["_hover_ic"] = _map_ic.apply(
                 lambda r: (
                     f"<b>{r['puesto']}</b><br>"
-                    f"⚠ Abelardo 2° — {r['pct_abelardo']:.1f}%<br>"
+                    f"Cepeda 1° — {r['pct_cepeda']:.1f}%<br>"
+                    f"Abelardo: {r['pct_abelardo']:.1f}%<br>"
                     f"Votos totales: {int(r['total_validos']):,}<br>"
                     f"Comuna: {r['comuna_label']}"
                 ), axis=1
@@ -3438,7 +3449,10 @@ with t_medellin:
                 customdata=_map_ic["puesto"].values,
                 marker=dict(
                     size=_map_ic["marker_size"],
-                    color="#CC0000",
+                    color=_map_ic["pct_cepeda"],
+                    colorscale=[[0, "#FF8080"], [0.5, "#CC0000"], [1, "#7B0000"]],
+                    cmin=30, cmax=70,
+                    showscale=False,
                     opacity=0.88,
                 ),
                 text=_map_ic["_hover_ic"],
@@ -4845,15 +4859,24 @@ with t_amva:
             ))
 
         if len(_av_map_ic):
+            _av_map_ic["pct_cepeda"] = (_av_map_ic["v_ivan_cepeda"] / _av_map_ic["total_validos"] * 100).round(1)
             _av_map_ic["_ht_ic"] = _av_map_ic.apply(
                 lambda r: (f"<b>{r['puesto']}</b><br>{r['municipio']}<br>"
-                           f"⚠ Abelardo 2° — {r['pct_abelardo']:.1f}%<br>"
+                           f"Cepeda 1° — {r['pct_cepeda']:.1f}%<br>"
+                           f"Abelardo: {r['pct_abelardo']:.1f}%<br>"
                            f"Votos totales: {int(r['total_validos']):,}"), axis=1)
             _fig_avm.add_trace(go.Scattermapbox(
                 lat=_av_map_ic["lat"], lon=_av_map_ic["lon"],
                 mode="markers", name="Cepeda 1°",
                 customdata=_av_map_ic["puesto"].values,
-                marker=dict(size=_av_map_ic["msize"], color="#CC0000", opacity=0.88),
+                marker=dict(
+                    size=_av_map_ic["msize"],
+                    color=_av_map_ic["pct_cepeda"],
+                    colorscale=[[0, "#FF8080"], [0.5, "#CC0000"], [1, "#7B0000"]],
+                    cmin=30, cmax=70,
+                    showscale=False,
+                    opacity=0.88,
+                ),
                 text=_av_map_ic["_ht_ic"], hoverinfo="text",
             ))
 
