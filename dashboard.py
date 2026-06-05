@@ -2727,7 +2727,7 @@ with t_antioquia:
                     customdata=[_anps["puesto"]],
                     marker=dict(size=26, color="#C8A96E", opacity=1.0),
                     text=[_anp_d_puesto], textposition="top center",
-                    textfont=dict(size=11, color="#C8A96E"),
+                    textfont=dict(size=13, color="#C8A96E"),
                     hovertext=(f"<b>★ {_anps['puesto']}</b><br>{_anps['municipio']}<br>"
                                f"Abelardo: {_anps['pct_abelardo']:.1f}%"),
                     hoverinfo="text",
@@ -2773,7 +2773,7 @@ with t_antioquia:
                 marker_color=_anp_bar["color"],
                 text=_anp_bar.apply(lambda r: f"{r['municipio'][:4]}· {r['pct_abelardo']:.1f}%", axis=1),
                 textposition="outside",
-                textfont=dict(size=9, color="#9A9A90", family="IBM Plex Mono"),
+                textfont=dict(size=13, color="#9A9A90", family="IBM Plex Mono"),
                 customdata=_anp_bar[["votos_abelardo","total_validos","municipio"]].values,
                 hovertemplate=("<b>%{y}</b><br>%{customdata[2]}<br>"
                                "AE: <b>%{x:.1f}%</b><br>"
@@ -2834,7 +2834,7 @@ with t_antioquia:
                         marker_color=_clr,
                         text=[f"{v:.0f}%" for v in _pcts],
                         textposition="inside", insidetextanchor="middle",
-                        textfont=dict(size=9,color="#FFFFFF",family="IBM Plex Mono"),
+                        textfont=dict(size=13,color="#FFFFFF",family="IBM Plex Mono"),
                         customdata=_vals,
                         hovertemplate=(f"<b>{_lbl}</b><br>%{{y:.1f}}% · %{{customdata:,}}<extra></extra>"),
                     ))
@@ -2984,7 +2984,7 @@ with t_antioquia:
                 marker_color="#1f77b4",
                 text=_anpws.apply(lambda r: f"{r['municipio'][:4]}· {r['pct_abelardo']:.1f}%", axis=1),
                 textposition="outside",
-                textfont=dict(size=9, color="#9A9A90", family="IBM Plex Mono"),
+                textfont=dict(size=13, color="#9A9A90", family="IBM Plex Mono"),
             ))
             _fig_anppw.add_trace(go.Bar(
                 name="Cepeda", y=_anpws["puesto"], x=_anpws["pct_ic"], orientation="h",
@@ -3042,7 +3042,7 @@ with t_antioquia:
                 name=label, marker_color=color,
                 text=_df.apply(lambda r: f"{r['municipio'][:4]}· {r[pct_col]:.1f}%", axis=1),
                 textposition="outside",
-                textfont=dict(size=9, color="#9A9A90", family="IBM Plex Mono"),
+                textfont=dict(size=13, color="#9A9A90", family="IBM Plex Mono"),
                 customdata=_df[["pct_abelardo","pct_ic","pot_ambos","total_validos","municipio"]].values,
                 hovertemplate=(
                     "<b>%{y}</b> · %{customdata[4]}<br>"
@@ -3435,7 +3435,7 @@ with t_medellin:
                 marker=dict(size=24, color="#C8A96E", opacity=1.0),
                 text=[_d_sel_puesto],
                 textposition="top center",
-                textfont=dict(size=11, color="#C8A96E"),
+                textfont=dict(size=13, color="#C8A96E"),
                 hoverinfo="text",
                 hovertext=(
                     f"<b>★ {_sel_row['puesto']}</b><br>"
@@ -3505,7 +3505,7 @@ with t_medellin:
             marker_color=_bar_df["color"],
             text=_bar_df["pct_abelardo"].apply(lambda v: f"{v:.1f}%"),
             textposition="outside",
-            textfont=dict(size=10, family="IBM Plex Mono", color="#9A9A90"),
+            textfont=dict(size=13, family="IBM Plex Mono", color="#9A9A90"),
             customdata=_bar_df[["votos_abelardo", "total_validos"]].values,
             hovertemplate=(
                 "<b>%{y}</b><br>"
@@ -3582,7 +3582,7 @@ with t_medellin:
                     text=[f"{v:.0f}%" for v in _pcts],
                     textposition="inside",
                     insidetextanchor="middle",
-                    textfont=dict(size=9, color="#FFFFFF", family="IBM Plex Mono"),
+                    textfont=dict(size=13, color="#FFFFFF", family="IBM Plex Mono"),
                     customdata=_vals,
                     hovertemplate=(
                         f"<b>{_lbl}</b><br>"
@@ -3767,7 +3767,7 @@ with t_medellin:
             marker_color="#1f77b4",
             text=_worst_sorted["pct_abelardo"].apply(lambda v: f"{v:.1f}%"),
             textposition="outside",
-            textfont=dict(size=9, color="#9A9A90", family="IBM Plex Mono"),
+            textfont=dict(size=13, color="#9A9A90", family="IBM Plex Mono"),
         ))
         _fig_pw.add_trace(go.Bar(
             name="Cepeda",
@@ -3777,7 +3777,7 @@ with t_medellin:
             marker_color="#CC0000",
             text=_worst_sorted["v_ivan_cepeda_pct"].apply(lambda v: f"{v:.1f}%"),
             textposition="outside",
-            textfont=dict(size=9, color="#9A9A90", family="IBM Plex Mono"),
+            textfont=dict(size=13, color="#9A9A90", family="IBM Plex Mono"),
         ))
         _fig_pw.update_layout(
             barmode="group",
@@ -3863,7 +3863,7 @@ with t_medellin:
             marker_color="#2ca02c",
             text=_pal_top20["v_paloma_valencia"].apply(lambda v: f"{int(v):,}"),
             textposition="outside",
-            textfont=dict(size=10, color="#9A9A90", family="IBM Plex Mono"),
+            textfont=dict(size=13, color="#9A9A90", family="IBM Plex Mono"),
             customdata=_pal_top20[["comuna_label","votos_abelardo","v_ivan_cepeda","total_validos"]].values,
             hovertemplate=(
                 "<b>%{y}</b> · %{customdata[0]}<br>"
@@ -3914,7 +3914,7 @@ with t_medellin:
             marker_color="#ff7f0e",
             text=_faj_top20["v_sergio_fajardo"].apply(lambda v: f"{int(v):,}"),
             textposition="outside",
-            textfont=dict(size=10, color="#9A9A90", family="IBM Plex Mono"),
+            textfont=dict(size=13, color="#9A9A90", family="IBM Plex Mono"),
             customdata=_faj_top20[["comuna_label","votos_abelardo","v_ivan_cepeda","total_validos"]].values,
             hovertemplate=(
                 "<b>%{y}</b> · %{customdata[0]}<br>"
@@ -4034,7 +4034,7 @@ with t_medellin:
                 marker_color=_clr,
                 text=_seg_city[_col].apply(lambda v: f"{v:.1f}%"),
                 textposition="inside", insidetextanchor="middle",
-                textfont=dict(size=11, color="#FFFFFF", family="IBM Plex Mono"),
+                textfont=dict(size=13, color="#FFFFFF", family="IBM Plex Mono"),
                 hovertemplate=f"<b>{_lbl}</b><br>%{{x}}: %{{y:.1f}}%<extra></extra>",
             ))
         _fig_et_stack.update_layout(
@@ -4068,7 +4068,7 @@ with t_medellin:
                 marker=dict(size=10, color=_clr),
                 text=_seg_city[_col].apply(lambda v: f"{v:.1f}%"),
                 textposition="top center",
-                textfont=dict(size=10, color=_clr, family="IBM Plex Mono"),
+                textfont=dict(size=13, color=_clr, family="IBM Plex Mono"),
                 hovertemplate=f"<b>{_lbl}</b><br>%{{x}}: %{{y:.1f}}%<extra></extra>",
             ))
         _fig_et_line.update_layout(
@@ -4455,7 +4455,7 @@ with t_medellin:
             marker_color=_clr,
             text=_v.map(lambda v: f"{v:.1f}%" if v >= 2.5 else ""),
             textposition="inside", insidetextanchor="middle",
-            textfont=dict(color="white", size=10, family="IBM Plex Mono"),
+            textfont=dict(color="white", size=13, family="IBM Plex Mono"),
             hovertemplate=f"<b>%{{x}}</b><br>{_lbl}: %{{y:.1f}}%<extra></extra>",
         ))
     _fig_com_all.update_layout(
@@ -4741,7 +4741,7 @@ with t_amva:
                 customdata=[_avs["puesto"]],
                 marker=dict(size=26, color="#C8A96E", opacity=1.0),
                 text=[_av_d_puesto], textposition="top center",
-                textfont=dict(size=11, color="#C8A96E"),
+                textfont=dict(size=13, color="#C8A96E"),
                 hovertext=(f"<b>★ {_avs['puesto']}</b><br>{_avs['municipio']}<br>"
                            f"Abelardo: {_avs['pct_abelardo']:.1f}%"),
                 hoverinfo="text",
@@ -4787,7 +4787,7 @@ with t_amva:
             marker_color=_av_bar["color"],
             text=_av_bar.apply(lambda r: f"{r['municipio'][:4]}· {r['pct_abelardo']:.1f}%", axis=1),
             textposition="outside",
-            textfont=dict(size=9, color="#9A9A90", family="IBM Plex Mono"),
+            textfont=dict(size=13, color="#9A9A90", family="IBM Plex Mono"),
             customdata=_av_bar[["votos_abelardo","total_validos","municipio"]].values,
             hovertemplate=("<b>%{y}</b><br>%{customdata[2]}<br>"
                            "AE: <b>%{x:.1f}%</b><br>"
@@ -4848,7 +4848,7 @@ with t_amva:
                     marker_color=_clr,
                     text=[f"{v:.0f}%" for v in _pcts],
                     textposition="inside", insidetextanchor="middle",
-                    textfont=dict(size=9,color="#FFFFFF",family="IBM Plex Mono"),
+                    textfont=dict(size=13,color="#FFFFFF",family="IBM Plex Mono"),
                     customdata=_vals,
                     hovertemplate=(f"<b>{_lbl}</b><br>%{{y:.1f}}% · %{{customdata:,}}<extra></extra>"),
                 ))
@@ -4969,7 +4969,7 @@ with t_amva:
             marker_color=_clr,
             text=_av_muni_sum[_col].apply(lambda v: f"{v:.1f}%"),
             textposition="outside",
-            textfont=dict(size=10, family="IBM Plex Mono", color="#9A9A90"),
+            textfont=dict(size=13, family="IBM Plex Mono", color="#9A9A90"),
             hovertemplate=f"<b>%{{x}}</b><br>{_lbl}: %{{y:.1f}}%<extra></extra>",
         ))
     _fig_avmuni.update_layout(
@@ -5026,7 +5026,7 @@ with t_amva:
             marker_color="#1f77b4",
             text=_avws.apply(lambda r: f"{r['municipio'][:4]}· {r['pct_abelardo']:.1f}%", axis=1),
             textposition="outside",
-            textfont=dict(size=9, color="#9A9A90", family="IBM Plex Mono"),
+            textfont=dict(size=13, color="#9A9A90", family="IBM Plex Mono"),
         ))
         _fig_avpw.add_trace(go.Bar(
             name="Cepeda", y=_avws["puesto"], x=_avws["pct_ic"], orientation="h",
@@ -5084,7 +5084,7 @@ with t_amva:
             name=label, marker_color=color,
             text=_df.apply(lambda r: f"{r['municipio'][:4]}· {r[pct_col]:.1f}%", axis=1),
             textposition="outside",
-            textfont=dict(size=9, color="#9A9A90", family="IBM Plex Mono"),
+            textfont=dict(size=13, color="#9A9A90", family="IBM Plex Mono"),
             customdata=_df[["pct_abelardo","pct_ic","pot_ambos","total_validos","municipio"]].values,
             hovertemplate=(
                 "<b>%{y}</b> · %{customdata[4]}<br>"
