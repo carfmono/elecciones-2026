@@ -3096,6 +3096,136 @@ with t_antioquia:
             _t_anpfaj["Válidos"] = _t_anpfaj["Válidos"].apply(lambda v: f"{int(v):,}")
             st.dataframe(_t_anpfaj, use_container_width=True, hide_index=True)
 
+        # ── Mapa coalición AE + Paloma + Fajardo – Antioquia ─────────────────
+        st.divider()
+        st.markdown("##### Mapa por puesto — votos AE + Paloma + Fajardo")
+
+        _ant_coal = _ant_p_all.dropna(subset=["lat","lon"]).copy()
+        _ant_coal["v_coalition"] = (
+            _ant_coal["v_abelardo_de_la_espriella"]
+            + _ant_coal["v_paloma_valencia"]
+            + _ant_coal["v_sergio_fajardo"]
+        )
+        _ant_coal["pct_coal"] = (_ant_coal["v_coalition"] / _ant_coal["total_validos"] * 100).round(1)
+        _ant_coal["pct_ic"]   = (_ant_coal["v_ivan_cepeda"] / _ant_coal["total_validos"] * 100).round(1)
+        _ant_coal["pct_ae_p"] = (_ant_coal["v_abelardo_de_la_espriella"] / _ant_coal["total_validos"] * 100).round(1)
+        _ant_coal["ms"] = (_ant_coal["total_validos"] / _ant_coal["total_validos"].max() * 14 + 5).clip(5, 20)
+        _ant_coal["hover"] = (
+            "<b>" + _ant_coal["puesto"] + "</b><br>"
+            + "AE+Paloma+Fajardo: <b>" + _ant_coal["pct_coal"].map(lambda x: f"{x:.1f}%") + "</b><br>"
+            + "Cepeda: " + _ant_coal["pct_ic"].map(lambda x: f"{x:.1f}%") + "<br>"
+            + "Solo AE: " + _ant_coal["pct_ae_p"].map(lambda x: f"{x:.1f}%") + "<br>"
+            + "Municipio: " + _ant_coal["municipio"] + "<br>"
+            + "Válidos: " + _ant_coal["total_validos"].map(lambda x: f"{int(x):,}")
+        )
+        _fig_ant_coal = go.Figure(go.Scattermapbox(
+            lat=_ant_coal["lat"], lon=_ant_coal["lon"],
+            mode="markers",
+            marker=go.scattermapbox.Marker(
+                size=_ant_coal["ms"], color=_ant_coal["pct_coal"],
+                colorscale=[[0.0,"#C0141C"],[0.5,"#F5F5F5"],[1.0,"#1565C0"]],
+                cmin=35, cmax=70,
+                colorbar=dict(title="% Coalición", x=1.0, thickness=14, len=0.6,
+                              tickfont=dict(color="#333",size=11),
+                              title_font=dict(color="#333"), ticksuffix="%"),
+                opacity=0.88,
+            ),
+            text=_ant_coal["hover"], hovertemplate="%{text}<extra></extra>",
+        ))
+        _fig_ant_coal.update_layout(
+            mapbox=dict(style="carto-positron", zoom=7, center={"lat":6.70,"lon":-75.50}),
+            height=600, margin=dict(l=0,r=0,t=0,b=0), paper_bgcolor="rgba(0,0,0,0)",
+        )
+        st.plotly_chart(_fig_ant_coal, use_container_width=True,
+                        config={"scrollZoom":True,"displayModeBar":False})
+
+        # ── Segmentación etaria por municipio – Antioquia ────────────────────
+        st.divider()
+        st.markdown("##### Grupos etarios por municipio — distribución de voto")
+
+        _ant_m_seg = _ant_m_all[_ant_m_all["total_validos"] > 0].copy()
+        _ant_m_seg = _ant_m_seg.sort_values(["puesto","mesa"])
+        _ant_ms_n    = _ant_m_seg.groupby("puesto")["mesa"].transform("count")
+        _ant_ms_rank = _ant_m_seg.groupby("puesto")["mesa"].rank(method="first")
+        _ant_ms_rel  = (_ant_ms_rank - 1) / (_ant_ms_n - 1).clip(lower=1)
+        _ant_m_seg["segmento"] = pd.cut(
+            _ant_ms_rel, bins=[-0.001, 0.25, 0.5, 0.75, 1.001],
+            labels=["60+ años", "40–59 años", "25–39 años", "18–24 años"],
+        ).astype(str)
+        _ant_seg_all = (
+            _ant_m_seg.groupby(["municipio","segmento"])
+            .agg(
+                v_ae     =("v_abelardo_de_la_espriella","sum"),
+                v_ic     =("v_ivan_cepeda","sum"),
+                v_paloma =("v_paloma_valencia","sum"),
+                v_fajardo=("v_sergio_fajardo","sum"),
+                total    =("total_validos","sum"),
+            ).reset_index()
+        )
+        _ant_seg_all["pct_ae"]     = (_ant_seg_all["v_ae"]     / _ant_seg_all["total"] * 100).round(1)
+        _ant_seg_all["pct_ic"]     = (_ant_seg_all["v_ic"]     / _ant_seg_all["total"] * 100).round(1)
+        _ant_seg_all["pct_paloma"] = (_ant_seg_all["v_paloma"] / _ant_seg_all["total"] * 100).round(1)
+        _ant_seg_all["pct_fajardo"]= (_ant_seg_all["v_fajardo"]/ _ant_seg_all["total"] * 100).round(1)
+
+        _ant_muni_et_opts = ["Antioquia total"] + sorted(_ant_p_all["municipio"].unique().tolist())
+        _sel_ant_muni_et  = st.selectbox("Seleccionar municipio", _ant_muni_et_opts,
+                                          key="sel_ant_muni_et")
+        if _sel_ant_muni_et == "Antioquia total":
+            _ant_et_agg = _ant_seg_all.groupby("segmento").agg(
+                v_ae=("v_ae","sum"), v_ic=("v_ic","sum"),
+                v_paloma=("v_paloma","sum"), v_fajardo=("v_fajardo","sum"),
+                total=("total","sum"),
+            ).reset_index()
+        else:
+            _ant_et_agg = (
+                _ant_seg_all[_ant_seg_all["municipio"] == _sel_ant_muni_et]
+                .groupby("segmento").agg(
+                    v_ae=("v_ae","sum"), v_ic=("v_ic","sum"),
+                    v_paloma=("v_paloma","sum"), v_fajardo=("v_fajardo","sum"),
+                    total=("total","sum"),
+                ).reset_index()
+            )
+        _ant_et_agg["pct_ae"]     = (_ant_et_agg["v_ae"]     / _ant_et_agg["total"] * 100).round(1)
+        _ant_et_agg["pct_ic"]     = (_ant_et_agg["v_ic"]     / _ant_et_agg["total"] * 100).round(1)
+        _ant_et_agg["pct_paloma"] = (_ant_et_agg["v_paloma"] / _ant_et_agg["total"] * 100).round(1)
+        _ant_et_agg["pct_fajardo"]= (_ant_et_agg["v_fajardo"]/ _ant_et_agg["total"] * 100).round(1)
+        _ant_et_agg["pct_otros"]  = (
+            100 - _ant_et_agg["pct_ae"] - _ant_et_agg["pct_ic"]
+            - _ant_et_agg["pct_paloma"] - _ant_et_agg["pct_fajardo"]
+        ).clip(0).round(1)
+        _ant_et_SEG = ["60+ años", "40–59 años", "25–39 años", "18–24 años"]
+        _ant_et_agg["segmento"] = pd.Categorical(
+            _ant_et_agg["segmento"], categories=_ant_et_SEG, ordered=True,
+        )
+        _ant_et_agg = _ant_et_agg.sort_values("segmento")
+        _fig_ant_et = go.Figure()
+        for _pct, _lbl, _col in [
+            ("pct_ae","Abelardo","#4A90C0"), ("pct_ic","Cepeda","#CC0000"),
+            ("pct_paloma","Paloma","#4CAF50"), ("pct_fajardo","Fajardo","#FF8C00"),
+            ("pct_otros","Otros","#666666"),
+        ]:
+            _v = _ant_et_agg[_pct]
+            _fig_ant_et.add_trace(go.Bar(
+                name=_lbl, x=_ant_et_agg["segmento"], y=_v,
+                marker_color=_col,
+                text=_v.map(lambda v: f"{v:.1f}%" if v >= 2 else ""),
+                textposition="inside", insidetextanchor="middle",
+                textfont=dict(color="white",size=13,family="IBM Plex Mono"),
+                hovertemplate=f"<b>%{{x}}</b><br>{_lbl}: %{{y:.1f}}%<extra></extra>",
+            ))
+        _fig_ant_et.update_layout(
+            barmode="stack", height=480,
+            margin=dict(l=0,r=0,t=10,b=0),
+            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#0A0A0A",
+            xaxis=dict(tickfont=dict(color="#F0EDE8",size=13), gridcolor="rgba(0,0,0,0)"),
+            yaxis=dict(ticksuffix="%", range=[0,100], gridcolor="#1E1E1E",
+                       tickfont=dict(color="#9A9A90")),
+            legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="left", x=0,
+                        font=dict(color="#9A9A90",size=11), bgcolor="rgba(0,0,0,0)",
+                        traceorder="normal"),
+        )
+        st.plotly_chart(_fig_ant_et, use_container_width=True, config={"displayModeBar":False})
+
 # ── Tab Medellín ──────────────────────────────────────────────────────────────
 with t_medellin:
     st.header("Medellín – Análisis por puesto y mesa")
@@ -4915,6 +5045,137 @@ with t_amva:
             _t_avfaj[_c] = _t_avfaj[_c].apply(lambda v: f"{v:.1f}%")
         _t_avfaj["Válidos"] = _t_avfaj["Válidos"].apply(lambda v: f"{int(v):,}")
         st.dataframe(_t_avfaj, use_container_width=True, hide_index=True)
+
+    st.divider()
+
+    # ── Mapa coalición AE + Paloma + Fajardo – AMVA ───────────────────────────
+    st.markdown("##### Mapa por puesto — votos AE + Paloma + Fajardo")
+
+    _av_coal = _amva_p_all.dropna(subset=["lat","lon"]).copy()
+    _av_coal["v_coalition"] = (
+        _av_coal["v_abelardo_de_la_espriella"]
+        + _av_coal["v_paloma_valencia"]
+        + _av_coal["v_sergio_fajardo"]
+    )
+    _av_coal["pct_coal"] = (_av_coal["v_coalition"] / _av_coal["total_validos"] * 100).round(1)
+    _av_coal["pct_ic"]   = (_av_coal["v_ivan_cepeda"] / _av_coal["total_validos"] * 100).round(1)
+    _av_coal["pct_ae_p"] = (_av_coal["v_abelardo_de_la_espriella"] / _av_coal["total_validos"] * 100).round(1)
+    _av_coal["ms"] = (_av_coal["total_validos"] / _av_coal["total_validos"].max() * 14 + 5).clip(5, 20)
+    _av_coal["hover"] = (
+        "<b>" + _av_coal["puesto"] + "</b><br>"
+        + "AE+Paloma+Fajardo: <b>" + _av_coal["pct_coal"].map(lambda x: f"{x:.1f}%") + "</b><br>"
+        + "Cepeda: " + _av_coal["pct_ic"].map(lambda x: f"{x:.1f}%") + "<br>"
+        + "Solo AE: " + _av_coal["pct_ae_p"].map(lambda x: f"{x:.1f}%") + "<br>"
+        + "Municipio: " + _av_coal["municipio"] + "<br>"
+        + "Válidos: " + _av_coal["total_validos"].map(lambda x: f"{int(x):,}")
+    )
+    _fig_av_coal = go.Figure(go.Scattermapbox(
+        lat=_av_coal["lat"], lon=_av_coal["lon"],
+        mode="markers",
+        marker=go.scattermapbox.Marker(
+            size=_av_coal["ms"], color=_av_coal["pct_coal"],
+            colorscale=[[0.0,"#C0141C"],[0.5,"#F5F5F5"],[1.0,"#1565C0"]],
+            cmin=35, cmax=70,
+            colorbar=dict(title="% Coalición", x=1.0, thickness=14, len=0.6,
+                          tickfont=dict(color="#333",size=11),
+                          title_font=dict(color="#333"), ticksuffix="%"),
+            opacity=0.88,
+        ),
+        text=_av_coal["hover"], hovertemplate="%{text}<extra></extra>",
+    ))
+    _fig_av_coal.update_layout(
+        mapbox=dict(style="carto-positron", zoom=10, center={"lat":6.23,"lon":-75.59}),
+        height=600, margin=dict(l=0,r=0,t=0,b=0), paper_bgcolor="rgba(0,0,0,0)",
+    )
+    st.plotly_chart(_fig_av_coal, use_container_width=True,
+                    config={"scrollZoom":True,"displayModeBar":False})
+
+    st.divider()
+
+    # ── Segmentación etaria por municipio – AMVA ──────────────────────────────
+    st.markdown("##### Grupos etarios por municipio — distribución de voto")
+
+    _av_m_seg = _amva_m_all[_amva_m_all["total_validos"] > 0].copy()
+    _av_m_seg = _av_m_seg.sort_values(["puesto","mesa"])
+    _av_ms_n    = _av_m_seg.groupby("puesto")["mesa"].transform("count")
+    _av_ms_rank = _av_m_seg.groupby("puesto")["mesa"].rank(method="first")
+    _av_ms_rel  = (_av_ms_rank - 1) / (_av_ms_n - 1).clip(lower=1)
+    _av_m_seg["segmento"] = pd.cut(
+        _av_ms_rel, bins=[-0.001, 0.25, 0.5, 0.75, 1.001],
+        labels=["60+ años", "40–59 años", "25–39 años", "18–24 años"],
+    ).astype(str)
+    _av_seg_all = (
+        _av_m_seg.groupby(["municipio","segmento"])
+        .agg(
+            v_ae     =("v_abelardo_de_la_espriella","sum"),
+            v_ic     =("v_ivan_cepeda","sum"),
+            v_paloma =("v_paloma_valencia","sum"),
+            v_fajardo=("v_sergio_fajardo","sum"),
+            total    =("total_validos","sum"),
+        ).reset_index()
+    )
+    _av_seg_all["pct_ae"]     = (_av_seg_all["v_ae"]     / _av_seg_all["total"] * 100).round(1)
+    _av_seg_all["pct_ic"]     = (_av_seg_all["v_ic"]     / _av_seg_all["total"] * 100).round(1)
+    _av_seg_all["pct_paloma"] = (_av_seg_all["v_paloma"] / _av_seg_all["total"] * 100).round(1)
+    _av_seg_all["pct_fajardo"]= (_av_seg_all["v_fajardo"]/ _av_seg_all["total"] * 100).round(1)
+
+    _av_muni_et_opts = ["AMVA total"] + _AMVA_MUNIS
+    _sel_av_muni_et  = st.selectbox("Seleccionar municipio", _av_muni_et_opts, key="sel_av_muni_et")
+    if _sel_av_muni_et == "AMVA total":
+        _av_et_agg = _av_seg_all.groupby("segmento").agg(
+            v_ae=("v_ae","sum"), v_ic=("v_ic","sum"),
+            v_paloma=("v_paloma","sum"), v_fajardo=("v_fajardo","sum"),
+            total=("total","sum"),
+        ).reset_index()
+    else:
+        _av_et_agg = (
+            _av_seg_all[_av_seg_all["municipio"] == _sel_av_muni_et]
+            .groupby("segmento").agg(
+                v_ae=("v_ae","sum"), v_ic=("v_ic","sum"),
+                v_paloma=("v_paloma","sum"), v_fajardo=("v_fajardo","sum"),
+                total=("total","sum"),
+            ).reset_index()
+        )
+    _av_et_agg["pct_ae"]     = (_av_et_agg["v_ae"]     / _av_et_agg["total"] * 100).round(1)
+    _av_et_agg["pct_ic"]     = (_av_et_agg["v_ic"]     / _av_et_agg["total"] * 100).round(1)
+    _av_et_agg["pct_paloma"] = (_av_et_agg["v_paloma"] / _av_et_agg["total"] * 100).round(1)
+    _av_et_agg["pct_fajardo"]= (_av_et_agg["v_fajardo"]/ _av_et_agg["total"] * 100).round(1)
+    _av_et_agg["pct_otros"]  = (
+        100 - _av_et_agg["pct_ae"] - _av_et_agg["pct_ic"]
+        - _av_et_agg["pct_paloma"] - _av_et_agg["pct_fajardo"]
+    ).clip(0).round(1)
+    _av_et_SEG = ["60+ años", "40–59 años", "25–39 años", "18–24 años"]
+    _av_et_agg["segmento"] = pd.Categorical(
+        _av_et_agg["segmento"], categories=_av_et_SEG, ordered=True,
+    )
+    _av_et_agg = _av_et_agg.sort_values("segmento")
+    _fig_av_et = go.Figure()
+    for _pct, _lbl, _col in [
+        ("pct_ae","Abelardo","#4A90C0"), ("pct_ic","Cepeda","#CC0000"),
+        ("pct_paloma","Paloma","#4CAF50"), ("pct_fajardo","Fajardo","#FF8C00"),
+        ("pct_otros","Otros","#666666"),
+    ]:
+        _v = _av_et_agg[_pct]
+        _fig_av_et.add_trace(go.Bar(
+            name=_lbl, x=_av_et_agg["segmento"], y=_v,
+            marker_color=_col,
+            text=_v.map(lambda v: f"{v:.1f}%" if v >= 2 else ""),
+            textposition="inside", insidetextanchor="middle",
+            textfont=dict(color="white",size=13,family="IBM Plex Mono"),
+            hovertemplate=f"<b>%{{x}}</b><br>{_lbl}: %{{y:.1f}}%<extra></extra>",
+        ))
+    _fig_av_et.update_layout(
+        barmode="stack", height=480,
+        margin=dict(l=0,r=0,t=10,b=0),
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#0A0A0A",
+        xaxis=dict(tickfont=dict(color="#F0EDE8",size=13), gridcolor="rgba(0,0,0,0)"),
+        yaxis=dict(ticksuffix="%", range=[0,100], gridcolor="#1E1E1E",
+                   tickfont=dict(color="#9A9A90")),
+        legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="left", x=0,
+                    font=dict(color="#9A9A90",size=11), bgcolor="rgba(0,0,0,0)",
+                    traceorder="normal"),
+    )
+    st.plotly_chart(_fig_av_et, use_container_width=True, config={"displayModeBar":False})
 
 
 # ── Pie de página ─────────────────────────────────────────────────────────────
