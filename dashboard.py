@@ -1353,7 +1353,7 @@ with t_depts:
         range_color=[-40, 40],
         hover_name="dept_nombre",
         hover_data={"pct": ":.1f", "pct_IC": ":.1f", "margen": ":.1f", "divipola": False},
-        labels={"margen": "Margen AE−IC (pp)", "pct": "% AE", "pct_IC": "% IC"},
+        labels={"margen": "Margen AE−IC (pp)", "pct": "% ADLE", "pct_IC": "% IC"},
         title="Margen AE − IC por departamento (azul = AE lidera, rojo = IC lidera)",
     )
     _fix_colombia_geo(fig_margin, height=460)
@@ -1467,7 +1467,7 @@ with t_fuerza_ae:
         top_show["pct_AE"]     = top_show["pct_AE"].apply(lambda v: f"{v:.1f}%")
         top_show["pct_IC"]     = top_show["pct_IC"].apply(lambda v: f"{v:.1f}%")
         top_show["diff_AE_IC"] = top_show["diff_AE_IC"].apply(lambda v: f"{v:+,.0f}")
-        top_show.columns = ["Depto", "Municipio", "V_AE", "% AE", "V_IC", "% IC", "Dif"]
+        top_show.columns = ["Depto", "Municipio", "V_AE", "% ADLE", "V_IC", "% IC", "Dif"]
         st.dataframe(top_show, use_container_width=True, hide_index=True, height=600)
 
     # Scatter % AE vs % IC — contexto nacional, departamento resaltado si hay filtro
@@ -1656,7 +1656,7 @@ with t_fuerza_paloma:
     for c in ["pct_Valencia", "pct_AE", "pct_IC"]:
         top_show[c] = top_show[c].apply(lambda v: f"{v:.1f}%")
     top_show.columns = ["Depto", "Municipio", "V_Paloma", "% Paloma",
-                        "V_AE", "V_IC", "% AE", "% IC"]
+                        "V_AE", "V_IC", "% ADLE", "% IC"]
     st.dataframe(top_show, use_container_width=True, hide_index=True)
 
 
@@ -1798,14 +1798,14 @@ with t_coalicion:
                     ))
     dept_coal["diff_coal"]    = dept_coal["votos_ae_coal"] - dept_coal["votos_ic_coal"]
     dept_coal["ganador_coal"] = dept_coal["diff_coal"].apply(
-        lambda d: "COALICIÓN AE" if d > 0 else "CEPEDA"
+        lambda d: "COALICIÓN ADLE" if d > 0 else "CEPEDA"
     )
     dept_coal = dept_coal.sort_values("diff_coal", ascending=False)
 
     fig_dept = px.bar(
         dept_coal, x="diff_coal", y="dept_nombre",
         color="ganador_coal",
-        color_discrete_map={"COALICIÓN AE": "#2ca02c", "CEPEDA": "#CC0000"},
+        color_discrete_map={"COALICIÓN ADLE": "#2ca02c", "CEPEDA": "#CC0000"},
         orientation="h",
         labels={"diff_coal": "Diferencia (coalición AE – Cepeda)",
                 "dept_nombre": "", "ganador_coal": ""},
@@ -1839,7 +1839,7 @@ with t_coalicion:
     _dept_orig_map["divipola"] = _dept_orig_map["dept_nombre"].map(DEPT_TO_DIVIPOLA)
     _dept_orig_map = _dept_orig_map.dropna(subset=["divipola"])
 
-    _GANADOR_COAL_COLORS = {"COALICIÓN AE": "#2ca02c", "CEPEDA": "#CC0000"}
+    _GANADOR_COAL_COLORS = {"COALICIÓN ADLE": "#2ca02c", "CEPEDA": "#CC0000"}
     _GANADOR_ORIG_COLORS = {"ABELARDO": "#1f77b4",    "CEPEDA": "#CC0000"}
 
     def _dept_choropleth(df, color_col, color_map, title):
@@ -1875,7 +1875,7 @@ with t_coalicion:
         (mun_coal["divipola_muni"].astype(str) != "")
     ].copy()
     _mun_coal_map["ganador_coal_label"] = _mun_coal_map["gana_coal"].map(
-        {1: "COALICIÓN AE", 0: "CEPEDA"}
+        {1: "COALICIÓN ADLE", 0: "CEPEDA"}
     )
 
     def _muni_choropleth(df, color_col, color_map, title):
@@ -2064,12 +2064,12 @@ with t_proyeccion:
     st.subheader("Mercados de predicción")
     _fig_pred = go.Figure()
     _fig_pred.add_trace(go.Bar(
-        name="Polymarket (1 jun)", x=["AE", "IC"],
+        name="Polymarket (1 jun)", x=["ADLE", "IC"],
         y=[88, 13], marker_color=["#1f77b4", "#CC0000"],
         text=["88%", "13%"], textposition="outside",
     ))
     _fig_pred.add_trace(go.Bar(
-        name="Kalshi (may)", x=["AE", "IC"],
+        name="Kalshi (may)", x=["ADLE", "IC"],
         y=[43, 41], marker_color=["#5fa8e0", "#e06060"],
         text=["43%", "41%"], textposition="outside",
     ))
@@ -2160,7 +2160,7 @@ with t_proyeccion:
             votos_nr  = int(total_fuente * restante / 100)
 
             st.caption(
-                f"AE: **{votos_ae:,}**  ·  IC: **{votos_ic:,}**  ·  "
+                f"ADLE: **{votos_ae:,}**  ·  IC: **{votos_ic:,}**  ·  "
                 f"Abs: **{votos_abs:,}**"
                 + (f"  ·  Sin asignar: {restante}% ({votos_nr:,})" if restante else "")
             )
@@ -2338,7 +2338,7 @@ with t_antioquia:
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("Municipios",        f"{len(ant):,}")
         c2.metric("Total votantes",    f"{ant['total_votantes'].sum():,}")
-        c3.metric("Votos AE",          f"{ant['votos_AE'].sum():,}")
+        c3.metric("Votos ADLE",          f"{ant['votos_AE'].sum():,}")
         c4.metric("Votos IC",          f"{ant['votos_IC'].sum():,}")
 
         munis_ae_ant = (ant["gana_AE"] == 1).sum()
@@ -2380,7 +2380,7 @@ with t_antioquia:
                 "divipola_muni": False,
             },
             labels={"ganador": "Ganador", "diff_AE_IC": "Diferencia AE−IC",
-                    "pct_AE": "% AE", "pct_IC": "% IC"},
+                    "pct_AE": "% ADLE", "pct_IC": "% IC"},
         )
         # Antioquia: bounds específicos para la región
         fig_ant_map.update_geos(
@@ -2405,7 +2405,7 @@ with t_antioquia:
         fig_ant.add_bar(
             x=ant_plot["muni_nombre"],
             y=ant_plot["pct_AE"],
-            name="% AE",
+            name="% ADLE",
             marker_color="#1f77b4",
             hovertemplate="%{x}<br>AE: %{y:.1f}%<extra></extra>",
         )
@@ -2442,7 +2442,7 @@ with t_antioquia:
         fig_ant_pal.add_bar(
             x=ant_pal["muni_nombre"],
             y=ant_pal["pct_AE"],
-            name="% AE",
+            name="% ADLE",
             marker_color="#1f77b4",
             opacity=0.55,
             hovertemplate="%{x}<br>AE: %{y:.1f}%<extra></extra>",
@@ -2477,7 +2477,7 @@ with t_antioquia:
                 top_ae.sort_values("pct_AE", ascending=True),
                 x="pct_AE", y="muni_nombre", orientation="h",
                 color_discrete_sequence=["#1f77b4"],
-                labels={"pct_AE": "% AE", "muni_nombre": ""},
+                labels={"pct_AE": "% ADLE", "muni_nombre": ""},
             )
             fig_ta.update_layout(height=500, margin=dict(l=0, r=20, t=10, b=0),
                                  yaxis={"categoryorder": "total ascending"})
@@ -2579,7 +2579,7 @@ with t_antioquia:
         tabla_ant["pct_IC"]          = tabla_ant["pct_IC"].apply(lambda v: f"{v:.1f}%")
         tabla_ant["diff_AE_IC"]      = tabla_ant["diff_AE_IC"].apply(lambda v: f"{v:+,.0f}")
         tabla_ant.columns = [
-            "Municipio", "Votantes", "Votos AE", "% AE",
+            "Municipio", "Votantes", "Votos ADLE", "% ADLE",
             "Votos IC", "% IC", "Votos Paloma", "Votos Fajardo",
             "Dif AE-IC", "Ganador",
         ]
@@ -2681,7 +2681,7 @@ with t_antioquia:
                 return (f"<b>{r['puesto']}</b><br>"
                         f"Municipio: {r['municipio']}<br>"
                         f"Abelardo: <b>{r['pct_abelardo']:.1f}%</b> · {int(r['votos_abelardo']):,}<br>"
-                        f"Válidos: {int(r['total_validos']):,}")
+                        f"Votos totales: {int(r['total_validos']):,}")
 
             _anp_map["_ht"] = _anp_map.apply(_anp_htxt, axis=1)
 
@@ -2698,7 +2698,7 @@ with t_antioquia:
                         color=_anp_map_ae["pct_abelardo"],
                         colorscale=[[0,"#a8d4f5"],[0.5,"#4A90C0"],[1,"#003880"]],
                         cmin=40, cmax=82, showscale=True,
-                        colorbar=dict(title="% AE", x=1.0, thickness=12, len=0.5,
+                        colorbar=dict(title="% ADLE", x=1.0, thickness=12, len=0.5,
                                       tickfont=dict(color="#444",size=10),
                                       title_font=dict(color="#444"), ticksuffix="%"),
                         opacity=0.88,
@@ -2710,7 +2710,7 @@ with t_antioquia:
                 _anp_map_ic["_ht_ic"] = _anp_map_ic.apply(
                     lambda r: (f"<b>{r['puesto']}</b><br>{r['municipio']}<br>"
                                f"AE 2° — {r['pct_abelardo']:.1f}%<br>"
-                               f"Válidos: {int(r['total_validos']):,}"), axis=1)
+                               f"Votos totales: {int(r['total_validos']):,}"), axis=1)
                 _fig_anpm.add_trace(go.Scattermapbox(
                     lat=_anp_map_ic["lat"], lon=_anp_map_ic["lon"],
                     mode="markers", name="Cepeda 1°",
@@ -2776,8 +2776,8 @@ with t_antioquia:
                 textfont=dict(size=13, color="#9A9A90", family="IBM Plex Mono"),
                 customdata=_anp_bar[["votos_abelardo","total_validos","municipio"]].values,
                 hovertemplate=("<b>%{y}</b><br>%{customdata[2]}<br>"
-                               "AE: <b>%{x:.1f}%</b><br>"
-                               "Votos: %{customdata[0]:,} · Válidos: %{customdata[1]:,}<extra></extra>"),
+                               "ADLE: <b>%{x:.1f}%</b><br>"
+                               "Votos: %{customdata[0]:,} · Votos totales: %{customdata[1]:,}<extra></extra>"),
             ))
             _fig_anpb.update_layout(
                 height=540, margin=dict(l=0,r=80,t=10,b=10),
@@ -2819,7 +2819,7 @@ with t_antioquia:
                               f"{_anp_pal_p/_anp_val_p*100:.1f}%", delta_color="off")
                 _anpd4.metric("Fajardo",  f"{_anp_faj_p:,}",
                               f"{_anp_faj_p/_anp_val_p*100:.1f}%", delta_color="off")
-                _anpd5.metric("Válidos",  f"{_anp_val_p:,}")
+                _anpd5.metric("Votos totales",  f"{_anp_val_p:,}")
                 _anpd6.metric("Mesas",    str(_anp_nm_p))
 
                 _anp_mlabels = [f"Mesa {int(r)}" for r in _anp_dmv["mesa"]]
@@ -2892,15 +2892,15 @@ with t_antioquia:
                               "total_validos","pct_abelardo","semaforo"]
                 _anp_rren  = {"mesa":"Mesa","votos_abelardo":"Abelardo","v_ivan_cepeda":"Cepeda",
                               "v_paloma_valencia":"Paloma","v_sergio_fajardo":"Fajardo",
-                              "total_validos":"Válidos","pct_abelardo":"% AE","semaforo":"Pos."}
+                              "total_validos":"Votos totales","pct_abelardo":"% ADLE","semaforo":"Pos."}
 
                 def _anp_fmt(df_in):
                     _anp_dmv2 = df_in.copy()
                     _anp_dmv2["semaforo"] = _anp_dmv2["semaforo"].map(
                         {"verde":"1°","amarillo":"2°","rojo":"3°+"}).fillna("?")
                     df_o = _anp_dmv2[_anp_rcols].rename(columns=_anp_rren).reset_index(drop=True)
-                    df_o["% AE"] = df_o["% AE"].apply(lambda v: f"{v:.1f}%")
-                    for _c in ["Abelardo","Cepeda","Paloma","Fajardo","Válidos"]:
+                    df_o["% ADLE"] = df_o["% ADLE"].apply(lambda v: f"{v:.1f}%")
+                    for _c in ["Abelardo","Cepeda","Paloma","Fajardo","Votos totales"]:
                         df_o[_c] = df_o[_c].apply(lambda v: f"{int(v):,}")
                     return df_o
 
@@ -2946,12 +2946,12 @@ with t_antioquia:
             "pct_ae","pct_ic","pct_paloma","pct_fajardo","pot_ambos"
         ]].rename(columns={
             "municipio":"Municipio","puestos":"Puestos","mesas":"Mesas",
-            "total_val":"Válidos","pct_ae":"% AE","pct_ic":"% IC",
-            "pct_paloma":"% Paloma","pct_fajardo":"% Fajardo","pot_ambos":"AE+Ambos",
+            "total_val":"Votos totales","pct_ae":"% ADLE","pct_ic":"% IC",
+            "pct_paloma":"% Paloma","pct_fajardo":"% Fajardo","pot_ambos":"ADLE+Ambos",
         }).reset_index(drop=True)
-        for _c in ["% AE","% IC","% Paloma","% Fajardo","AE+Ambos"]:
+        for _c in ["% ADLE","% IC","% Paloma","% Fajardo","ADLE+Ambos"]:
             _anp_tbl[_c] = _anp_tbl[_c].apply(lambda v: f"{v:.1f}%")
-        _anp_tbl["Válidos"] = _anp_tbl["Válidos"].apply(lambda v: f"{int(v):,}")
+        _anp_tbl["Votos totales"] = _anp_tbl["Votos totales"].apply(lambda v: f"{int(v):,}")
         _anp_tbl["Mesas"]   = _anp_tbl["Mesas"].apply(lambda v: f"{int(v):,}")
         st.dataframe(_anp_tbl, use_container_width=True, hide_index=True)
 
@@ -3010,14 +3010,14 @@ with t_antioquia:
                     "dif_ic_ae","pct_paloma","pct_fajardo","pot_ambos","total_validos",
                 ]].rename(columns={
                     "puesto":"Puesto","municipio":"Municipio",
-                    "pct_abelardo":"% AE","pct_ic":"% IC","dif_ic_ae":"Dif IC–AE",
+                    "pct_abelardo":"% ADLE","pct_ic":"% IC","dif_ic_ae":"Dif IC–AE",
                     "pct_paloma":"% Paloma","pct_fajardo":"% Fajardo",
-                    "pot_ambos":"AE+Ambos","total_validos":"Válidos",
+                    "pot_ambos":"ADLE+Ambos","total_validos":"Votos totales",
                 }).sort_values("Dif IC–AE", ascending=False).reset_index(drop=True)
-                for _c in ["% AE","% IC","% Paloma","% Fajardo","AE+Ambos"]:
+                for _c in ["% ADLE","% IC","% Paloma","% Fajardo","ADLE+Ambos"]:
                     _anpic_t[_c] = _anpic_t[_c].apply(lambda v: f"{v:.1f}%")
                 _anpic_t["Dif IC–AE"] = _anpic_t["Dif IC–AE"].apply(lambda v: f"+{v:.1f}pp")
-                _anpic_t["Válidos"]   = _anpic_t["Válidos"].apply(lambda v: f"{int(v):,}")
+                _anpic_t["Votos totales"]   = _anpic_t["Votos totales"].apply(lambda v: f"{int(v):,}")
                 st.dataframe(_anpic_t, use_container_width=True, hide_index=True, height=520)
                 st.caption("AE+Ambos: % si Abelardo recibe el 100% de Paloma + Fajardo")
             else:
@@ -3047,7 +3047,7 @@ with t_antioquia:
                 hovertemplate=(
                     "<b>%{y}</b> · %{customdata[4]}<br>"
                     f"{label}: <b>%{{x:.1f}}%</b><br>"
-                    "AE: %{customdata[0]:.1f}% · IC: %{customdata[1]:.1f}%<br>"
+                    "ADLE: %{customdata[0]:.1f}% · IC: %{customdata[1]:.1f}%<br>"
                     "AE+Ambos: %{customdata[2]:.1f}%<extra></extra>"
                 ),
             ))
@@ -3075,11 +3075,11 @@ with t_antioquia:
             _t_anppal = _df_anppal[["puesto","municipio","pct_paloma","pct_abelardo",
                                     "pct_ic","pot_ambos","total_validos"]].rename(columns={
                 "puesto":"Puesto","municipio":"Municipio","pct_paloma":"% Paloma",
-                "pct_abelardo":"% AE","pct_ic":"% IC","pot_ambos":"AE+Ambos","total_validos":"Válidos"
+                "pct_abelardo":"% ADLE","pct_ic":"% IC","pot_ambos":"ADLE+Ambos","total_validos":"Votos totales"
             }).reset_index(drop=True)
-            for _c in ["% Paloma","% AE","% IC","AE+Ambos"]:
+            for _c in ["% Paloma","% ADLE","% IC","ADLE+Ambos"]:
                 _t_anppal[_c] = _t_anppal[_c].apply(lambda v: f"{v:.1f}%")
-            _t_anppal["Válidos"] = _t_anppal["Válidos"].apply(lambda v: f"{int(v):,}")
+            _t_anppal["Votos totales"] = _t_anppal["Votos totales"].apply(lambda v: f"{int(v):,}")
             st.dataframe(_t_anppal, use_container_width=True, hide_index=True)
 
         with _anppf2:
@@ -3089,11 +3089,11 @@ with t_antioquia:
             _t_anpfaj = _df_anpfaj[["puesto","municipio","pct_fajardo","pct_abelardo",
                                     "pct_ic","pot_ambos","total_validos"]].rename(columns={
                 "puesto":"Puesto","municipio":"Municipio","pct_fajardo":"% Fajardo",
-                "pct_abelardo":"% AE","pct_ic":"% IC","pot_ambos":"AE+Ambos","total_validos":"Válidos"
+                "pct_abelardo":"% ADLE","pct_ic":"% IC","pot_ambos":"ADLE+Ambos","total_validos":"Votos totales"
             }).reset_index(drop=True)
-            for _c in ["% Fajardo","% AE","% IC","AE+Ambos"]:
+            for _c in ["% Fajardo","% ADLE","% IC","ADLE+Ambos"]:
                 _t_anpfaj[_c] = _t_anpfaj[_c].apply(lambda v: f"{v:.1f}%")
-            _t_anpfaj["Válidos"] = _t_anpfaj["Válidos"].apply(lambda v: f"{int(v):,}")
+            _t_anpfaj["Votos totales"] = _t_anpfaj["Votos totales"].apply(lambda v: f"{int(v):,}")
             st.dataframe(_t_anpfaj, use_container_width=True, hide_index=True)
 
         # ── Mapa coalición AE + Paloma + Fajardo – Antioquia ─────────────────
@@ -3116,7 +3116,7 @@ with t_antioquia:
             + "Cepeda: " + _ant_coal["pct_ic"].map(lambda x: f"{x:.1f}%") + "<br>"
             + "Solo AE: " + _ant_coal["pct_ae_p"].map(lambda x: f"{x:.1f}%") + "<br>"
             + "Municipio: " + _ant_coal["municipio"] + "<br>"
-            + "Válidos: " + _ant_coal["total_validos"].map(lambda x: f"{int(x):,}")
+            + "Votos totales: " + _ant_coal["total_validos"].map(lambda x: f"{int(x):,}")
         )
         _fig_ant_coal = go.Figure(go.Scattermapbox(
             lat=_ant_coal["lat"], lon=_ant_coal["lon"],
@@ -3331,7 +3331,7 @@ with t_medellin:
             return (
                 f"<b>{row['puesto']}</b><br>"
                 f"Abelardo: <b>{row['pct_abelardo']:.1f}%</b> · {int(row['votos_abelardo']):,} votos<br>"
-                f"Válidos: {int(row['total_validos']):,}<br>"
+                f"Votos totales: {int(row['total_validos']):,}<br>"
                 f"Comuna: {row['comuna_label']}"
             )
 
@@ -3384,7 +3384,7 @@ with t_medellin:
                     cmin=40, cmax=82,
                     showscale=True,
                     colorbar=dict(
-                        title="% AE",
+                        title="% ADLE",
                         x=1.0,
                         thickness=12,
                         len=0.55,
@@ -3404,7 +3404,7 @@ with t_medellin:
                 lambda r: (
                     f"<b>{r['puesto']}</b><br>"
                     f"⚠ Abelardo 2° — {r['pct_abelardo']:.1f}%<br>"
-                    f"Válidos: {int(r['total_validos']):,}<br>"
+                    f"Votos totales: {int(r['total_validos']):,}<br>"
                     f"Comuna: {r['comuna_label']}"
                 ), axis=1
             )
@@ -3440,7 +3440,7 @@ with t_medellin:
                 hovertext=(
                     f"<b>★ {_sel_row['puesto']}</b><br>"
                     f"Abelardo: {_sel_row['pct_abelardo']:.1f}%<br>"
-                    f"Válidos: {int(_sel_row['total_validos']):,}"
+                    f"Votos totales: {int(_sel_row['total_validos']):,}"
                 ),
             ))
             # Centrar mapa en el puesto seleccionado
@@ -3511,7 +3511,7 @@ with t_medellin:
                 "<b>%{y}</b><br>"
                 "Abelardo: <b>%{x:.1f}%</b><br>"
                 "Votos: %{customdata[0]:,}<br>"
-                "Válidos: %{customdata[1]:,}<extra></extra>"
+                "Votos totales: %{customdata[1]:,}<extra></extra>"
             ),
         ))
         _fig_bar.update_layout(
@@ -3562,7 +3562,7 @@ with t_medellin:
                         f"{_d_pal/_d_val*100:.1f}%", delta_color="off")
             _dm4.metric("Fajardo",   f"{_d_faj:,}",
                         f"{_d_faj/_d_val*100:.1f}%", delta_color="off")
-            _dm5.metric("Válidos",   f"{_d_val:,}")
+            _dm5.metric("Votos totales",   f"{_d_val:,}")
             _dm6.metric("Mesas",     str(_d_nm))
 
             st.markdown("")
@@ -3696,15 +3696,15 @@ with t_medellin:
                 "v_ivan_cepeda":         "Cepeda",
                 "v_paloma_valencia":     "Paloma",
                 "v_sergio_fajardo":      "Fajardo",
-                "total_validos":         "Válidos",
-                "pct_abelardo":          "% AE",
+                "total_validos":         "Votos totales",
+                "pct_abelardo":          "% ADLE",
                 "sem_icon":              "Pos.",
             }
 
             def _fmt_rank(df_in):
                 df_o = df_in[_rank_cols].rename(columns=_rank_rename).reset_index(drop=True).copy()
-                df_o["% AE"]    = df_o["% AE"].apply(lambda v: f"{v:.1f}%")
-                for _c in ["Abelardo", "Cepeda", "Paloma", "Fajardo", "Válidos"]:
+                df_o["% ADLE"]    = df_o["% ADLE"].apply(lambda v: f"{v:.1f}%")
+                for _c in ["Abelardo", "Cepeda", "Paloma", "Fajardo", "Votos totales"]:
                     df_o[_c] = df_o[_c].apply(lambda v: f"{int(v):,}")
                 return df_o
 
@@ -3814,20 +3814,20 @@ with t_medellin:
             ]].rename(columns={
                 "puesto":            "Puesto",
                 "comuna_label":      "Comuna",
-                "pct_abelardo":      "% AE",
+                "pct_abelardo":      "% ADLE",
                 "v_ivan_cepeda_pct": "% IC",
                 "dif_ic_ae":         "Dif IC–AE",
                 "pct_paloma":        "% Paloma",
                 "pct_fajardo":       "% Fajardo",
-                "pot_paloma":        "AE + Paloma",
-                "pot_fajardo":       "AE + Fajardo",
-                "total_validos":     "Válidos",
+                "pot_paloma":        "ADLE + Paloma",
+                "pot_fajardo":       "ADLE + Fajardo",
+                "total_validos":     "Votos totales",
             }).sort_values("Dif IC–AE", ascending=False).reset_index(drop=True)
 
-            for _c in ["% AE", "% IC", "% Paloma", "% Fajardo", "AE + Paloma", "AE + Fajardo"]:
+            for _c in ["% ADLE", "% IC", "% Paloma", "% Fajardo", "ADLE + Paloma", "ADLE + Fajardo"]:
                 _ic_tbl[_c] = _ic_tbl[_c].apply(lambda v: f"{v:.1f}%")
             _ic_tbl["Dif IC–AE"] = _ic_tbl["Dif IC–AE"].apply(lambda v: f"+{v:.1f}pp")
-            _ic_tbl["Válidos"]   = _ic_tbl["Válidos"].apply(lambda v: f"{int(v):,}")
+            _ic_tbl["Votos totales"]   = _ic_tbl["Votos totales"].apply(lambda v: f"{int(v):,}")
 
             st.dataframe(_ic_tbl, use_container_width=True,
                          hide_index=True, height=540)
@@ -3866,25 +3866,25 @@ with t_medellin:
             "dif_ae_ic", "pct_paloma", "pct_fajardo", "total_validos"
         ]].rename(columns={
             "puesto": "Puesto", "comuna_label": "Comuna",
-            "pct_abelardo": "% AE", "v_ivan_cepeda_pct": "% IC",
-            "dif_ae_ic": "Ventaja AE",
+            "pct_abelardo": "% ADLE", "v_ivan_cepeda_pct": "% IC",
+            "dif_ae_ic": "Ventaja ADLE",
             "pct_paloma": "% Paloma", "pct_fajardo": "% Fajardo",
-            "total_validos": "Válidos",
+            "total_validos": "Votos totales",
         }).reset_index(drop=True)
-        for _c in ["% AE", "% IC", "% Paloma", "% Fajardo"]:
+        for _c in ["% ADLE", "% IC", "% Paloma", "% Fajardo"]:
             _ren_tbl[_c] = _ren_tbl[_c].apply(lambda v: f"{v:.1f}%")
-        _ren_tbl["Ventaja AE"] = _ren_tbl["Ventaja AE"].apply(lambda v: f"+{v:.2f}pp")
-        _ren_tbl["Válidos"] = _ren_tbl["Válidos"].apply(lambda v: f"{int(v):,}")
+        _ren_tbl["Ventaja ADLE"] = _ren_tbl["Ventaja ADLE"].apply(lambda v: f"+{v:.2f}pp")
+        _ren_tbl["Votos totales"] = _ren_tbl["Votos totales"].apply(lambda v: f"{int(v):,}")
         st.dataframe(_ren_tbl, use_container_width=True, hide_index=True, height=530)
 
     with _ren_c2:
         _ren_map = _renidos.dropna(subset=["lat", "lon"]).copy()
         _ren_map["hover"] = (
             "<b>" + _ren_map["puesto"] + "</b><br>"
-            + "AE: " + _ren_map["pct_abelardo"].map(lambda v: f"{v:.1f}%")
+            + "ADLE: " + _ren_map["pct_abelardo"].map(lambda v: f"{v:.1f}%")
             + " · IC: " + _ren_map["v_ivan_cepeda_pct"].map(lambda v: f"{v:.1f}%") + "<br>"
             + "Ventaja: +" + _ren_map["dif_ae_ic"].map(lambda v: f"{v:.2f}pp") + "<br>"
-            + "Válidos: " + _ren_map["total_validos"].map(lambda v: f"{int(v):,}")
+            + "Votos totales: " + _ren_map["total_validos"].map(lambda v: f"{int(v):,}")
         )
         _ren_map["size"] = (_ren_map["total_validos"] / _ren_map["total_validos"].max() * 16 + 8).clip(8, 24)
         _ren_map["color_val"] = _ren_map["dif_ae_ic"]
@@ -3948,8 +3948,8 @@ with t_medellin:
             hovertemplate=(
                 "<b>%{y}</b> · %{customdata[0]}<br>"
                 "Paloma: <b>%{x:,} votos</b><br>"
-                "AE: %{customdata[1]:,} · IC: %{customdata[2]:,}<br>"
-                "Válidos: %{customdata[3]:,}<extra></extra>"
+                "ADLE: %{customdata[1]:,} · IC: %{customdata[2]:,}<br>"
+                "Votos totales: %{customdata[3]:,}<extra></extra>"
             ),
         ))
         _fig_pal2.update_layout(
@@ -3968,11 +3968,11 @@ with t_medellin:
                                  "votos_abelardo","v_ivan_cepeda","total_validos"]].rename(columns={
             "rank": "#", "puesto": "Puesto", "comuna_label": "Comuna",
             "v_paloma_valencia": "Votos Paloma",
-            "votos_abelardo": "Votos AE",
+            "votos_abelardo": "Votos ADLE",
             "v_ivan_cepeda": "Votos IC",
-            "total_validos": "Válidos",
+            "total_validos": "Votos totales",
         }).reset_index(drop=True)
-        for _c in ["Votos Paloma", "Votos AE", "Votos IC", "Válidos"]:
+        for _c in ["Votos Paloma", "Votos ADLE", "Votos IC", "Votos totales"]:
             _tbl_pal2[_c] = _tbl_pal2[_c].apply(lambda v: f"{int(v):,}")
         st.dataframe(_tbl_pal2, use_container_width=True, hide_index=True)
 
@@ -3999,8 +3999,8 @@ with t_medellin:
             hovertemplate=(
                 "<b>%{y}</b> · %{customdata[0]}<br>"
                 "Fajardo: <b>%{x:,} votos</b><br>"
-                "AE: %{customdata[1]:,} · IC: %{customdata[2]:,}<br>"
-                "Válidos: %{customdata[3]:,}<extra></extra>"
+                "ADLE: %{customdata[1]:,} · IC: %{customdata[2]:,}<br>"
+                "Votos totales: %{customdata[3]:,}<extra></extra>"
             ),
         ))
         _fig_faj2.update_layout(
@@ -4019,11 +4019,11 @@ with t_medellin:
                                  "votos_abelardo","v_ivan_cepeda","total_validos"]].rename(columns={
             "rank": "#", "puesto": "Puesto", "comuna_label": "Comuna",
             "v_sergio_fajardo": "Votos Fajardo",
-            "votos_abelardo": "Votos AE",
+            "votos_abelardo": "Votos ADLE",
             "v_ivan_cepeda": "Votos IC",
-            "total_validos": "Válidos",
+            "total_validos": "Votos totales",
         }).reset_index(drop=True)
-        for _c in ["Votos Fajardo", "Votos AE", "Votos IC", "Válidos"]:
+        for _c in ["Votos Fajardo", "Votos ADLE", "Votos IC", "Votos totales"]:
             _tbl_faj2[_c] = _tbl_faj2[_c].apply(lambda v: f"{int(v):,}")
         st.dataframe(_tbl_faj2, use_container_width=True, hide_index=True)
 
@@ -4253,7 +4253,7 @@ with t_medellin:
                 f"Cepeda: {_r['pct_ic']:.1f}% · {int(_r['v_ic']):,}<br>"
                 f"Paloma: {_r['pct_paloma']:.1f}% · {int(_r['v_paloma']):,}<br>"
                 f"Fajardo: {_r['pct_fajardo']:.1f}% · {int(_r['v_fajardo']):,}<br>"
-                f"Válidos: {int(_r['validos']):,} · Puestos: {int(_r['puestos'])}"
+                f"Votos totales: {int(_r['validos']):,} · Puestos: {int(_r['puestos'])}"
             )
         else:
             _geo_pct_ae.append(None)
@@ -4267,7 +4267,7 @@ with t_medellin:
         colorscale=[[0,"#a8d4f5"],[0.4,"#4A90C0"],[0.7,"#1a5fa8"],[1,"#003880"]],
         zmin=40, zmax=75,
         colorbar=dict(
-            title="% AE", x=1.0, thickness=14, len=0.6,
+            title="% ADLE", x=1.0, thickness=14, len=0.6,
             tickfont=dict(color="#333", size=11),
             title_font=dict(color="#333"),
             ticksuffix="%",
@@ -4323,7 +4323,7 @@ with t_medellin:
         + "AE+Paloma+Fajardo: <b>" + _fp_coal["pct_coal"].map(lambda x: f"{x:.1f}%") + "</b><br>"
         + "Cepeda: " + _fp_coal["pct_ic"].map(lambda x: f"{x:.1f}%") + "<br>"
         + "Solo AE: " + _fp_coal["pct_ae_p"].map(lambda x: f"{x:.1f}%") + "<br>"
-        + "Válidos: " + _fp_coal["total_validos"].map(lambda x: f"{int(x):,}")
+        + "Votos totales: " + _fp_coal["total_validos"].map(lambda x: f"{int(x):,}")
     )
 
     _fig_coal_map = go.Figure(go.Scattermapbox(
@@ -4554,10 +4554,10 @@ with t_medellin:
 
     # ── Tabla votos absolutos por comuna — todos los candidatos ──────────────
     _tbl_votos = _com_all[["comuna_label","validos"]].copy()
-    _tbl_votos.rename(columns={"comuna_label":"Comuna","validos":"Válidos"}, inplace=True)
+    _tbl_votos.rename(columns={"comuna_label":"Comuna","validos":"Votos totales"}, inplace=True)
     for _col, _lbl, _ in _ALL_CANDS_MED:
         _tbl_votos[_lbl] = _com_all[_col].apply(lambda v: f"{int(v):,}")
-    _tbl_votos["Válidos"] = _tbl_votos["Válidos"].apply(lambda v: f"{int(v):,}")
+    _tbl_votos["Votos totales"] = _tbl_votos["Votos totales"].apply(lambda v: f"{int(v):,}")
     _tbl_votos = _tbl_votos.reset_index(drop=True)
     st.dataframe(_tbl_votos, use_container_width=True, hide_index=True, height=560)
 
@@ -4612,13 +4612,13 @@ with t_medellin:
     ]].rename(columns={
         "comuna_label":"Comuna","puestos":"Puestos","mesas":"Mesas",
         "est_inscritos":"Inscritos*","est_sufragantes":"Sufragantes*","est_pct_part":"% Part.*",
-        "validos":"Válidos",
-        "v_ae":"Votos AE","pct_ae":"% AE","v_ic":"Votos IC","pct_ic":"% IC",
+        "validos":"Votos totales",
+        "v_ae":"Votos ADLE","pct_ae":"% ADLE","v_ic":"Votos IC","pct_ic":"% IC",
         "v_paloma":"Votos Paloma","pct_paloma":"% Paloma","v_fajardo":"Votos Fajardo","pct_fajardo":"% Fajardo",
     }).reset_index(drop=True)
-    for _c in ["Inscritos*","Sufragantes*","Válidos","Votos AE","Votos IC","Votos Paloma","Votos Fajardo"]:
+    for _c in ["Inscritos*","Sufragantes*","Votos totales","Votos ADLE","Votos IC","Votos Paloma","Votos Fajardo"]:
         _tbl1[_c] = _tbl1[_c].apply(lambda v: f"{int(v):,}")
-    for _c in ["% Part.*","% AE","% IC","% Paloma","% Fajardo"]:
+    for _c in ["% Part.*","% ADLE","% IC","% Paloma","% Fajardo"]:
         _tbl1[_c] = _tbl1[_c].apply(lambda v: f"{v:.1f}%")
     _tbl1["Mesas"] = _tbl1["Mesas"].apply(lambda v: f"{int(v):,}")
 
@@ -4641,25 +4641,25 @@ with t_medellin:
     _seg_long = _seg_com_all.sort_values(["cod_comuna","segmento"]).copy()
     _seg_long = _seg_long.rename(columns={
         "comuna_label":"Comuna","segmento":"Grupo etario",
-        "pct_ae":"% AE","pct_ic":"% IC","pct_paloma":"% Paloma","pct_fajardo":"% Fajardo",
-        "total":"Válidos",
+        "pct_ae":"% ADLE","pct_ic":"% IC","pct_paloma":"% Paloma","pct_fajardo":"% Fajardo",
+        "total":"Votos totales",
     })
 
     # Filas de total ciudad por grupo etario
     _seg_city_long = _seg_city.rename(columns={
-        "segmento":"Grupo etario","pct_ae":"% AE","pct_ic":"% IC",
-        "pct_paloma":"% Paloma","pct_fajardo":"% Fajardo","total":"Válidos",
+        "segmento":"Grupo etario","pct_ae":"% ADLE","pct_ic":"% IC",
+        "pct_paloma":"% Paloma","pct_fajardo":"% Fajardo","total":"Votos totales",
     }).copy()
     _seg_city_long["Comuna"] = "TOTAL MEDELLÍN"
 
     _tbl2 = pd.concat([
-        _seg_long[["Comuna","Grupo etario","Válidos","% AE","% IC","% Paloma","% Fajardo"]],
-        _seg_city_long[["Comuna","Grupo etario","Válidos","% AE","% IC","% Paloma","% Fajardo"]],
+        _seg_long[["Comuna","Grupo etario","Votos totales","% ADLE","% IC","% Paloma","% Fajardo"]],
+        _seg_city_long[["Comuna","Grupo etario","Votos totales","% ADLE","% IC","% Paloma","% Fajardo"]],
     ], ignore_index=True)
 
-    for _c in ["% AE","% IC","% Paloma","% Fajardo"]:
+    for _c in ["% ADLE","% IC","% Paloma","% Fajardo"]:
         _tbl2[_c] = _tbl2[_c].apply(lambda v: f"{v:.1f}%" if pd.notna(v) else "—")
-    _tbl2["Válidos"] = _tbl2["Válidos"].apply(lambda v: f"{int(v):,}" if pd.notna(v) else "—")
+    _tbl2["Votos totales"] = _tbl2["Votos totales"].apply(lambda v: f"{int(v):,}" if pd.notna(v) else "—")
 
     st.dataframe(_tbl2, use_container_width=True, hide_index=True, height=600)
 
@@ -4763,7 +4763,7 @@ with t_amva:
             return (f"<b>{r['puesto']}</b><br>"
                     f"Municipio: {r['municipio']}<br>"
                     f"Abelardo: <b>{r['pct_abelardo']:.1f}%</b> · {int(r['votos_abelardo']):,}<br>"
-                    f"Válidos: {int(r['total_validos']):,}")
+                    f"Votos totales: {int(r['total_validos']):,}")
 
         _av_map["_ht"] = _av_map.apply(_av_htxt, axis=1)
 
@@ -4792,7 +4792,7 @@ with t_amva:
                     color=_av_map_ae["pct_abelardo"],
                     colorscale=[[0,"#a8d4f5"],[0.5,"#4A90C0"],[1,"#003880"]],
                     cmin=40, cmax=82, showscale=True,
-                    colorbar=dict(title="% AE", x=1.0, thickness=12, len=0.5,
+                    colorbar=dict(title="% ADLE", x=1.0, thickness=12, len=0.5,
                                   tickfont=dict(color="#444",size=10),
                                   title_font=dict(color="#444"), ticksuffix="%"),
                     opacity=0.88,
@@ -4804,7 +4804,7 @@ with t_amva:
             _av_map_ic["_ht_ic"] = _av_map_ic.apply(
                 lambda r: (f"<b>{r['puesto']}</b><br>{r['municipio']}<br>"
                            f"⚠ Abelardo 2° — {r['pct_abelardo']:.1f}%<br>"
-                           f"Válidos: {int(r['total_validos']):,}"), axis=1)
+                           f"Votos totales: {int(r['total_validos']):,}"), axis=1)
             _fig_avm.add_trace(go.Scattermapbox(
                 lat=_av_map_ic["lat"], lon=_av_map_ic["lon"],
                 mode="markers", name="Cepeda 1°",
@@ -4870,8 +4870,8 @@ with t_amva:
             textfont=dict(size=13, color="#9A9A90", family="IBM Plex Mono"),
             customdata=_av_bar[["votos_abelardo","total_validos","municipio"]].values,
             hovertemplate=("<b>%{y}</b><br>%{customdata[2]}<br>"
-                           "AE: <b>%{x:.1f}%</b><br>"
-                           "Votos: %{customdata[0]:,} · Válidos: %{customdata[1]:,}<extra></extra>"),
+                           "ADLE: <b>%{x:.1f}%</b><br>"
+                           "Votos: %{customdata[0]:,} · Votos totales: %{customdata[1]:,}<extra></extra>"),
         ))
         _fig_avb.update_layout(
             height=540, margin=dict(l=0,r=80,t=10,b=10),
@@ -4913,7 +4913,7 @@ with t_amva:
                          f"{_av_pal_p/_av_val_p*100:.1f}%", delta_color="off")
             _amd4.metric("Fajardo",  f"{_av_faj_p:,}",
                          f"{_av_faj_p/_av_val_p*100:.1f}%", delta_color="off")
-            _amd5.metric("Válidos",  f"{_av_val_p:,}")
+            _amd5.metric("Votos totales",  f"{_av_val_p:,}")
             _amd6.metric("Mesas",    str(_av_nm_p))
 
             _av_mlabels = [f"Mesa {int(r)}" for r in _av_dmv["mesa"]]
@@ -4988,12 +4988,12 @@ with t_amva:
                          "total_validos","pct_abelardo","sem_icon"]
             _av_rren  = {"mesa":"Mesa","votos_abelardo":"Abelardo","v_ivan_cepeda":"Cepeda",
                          "v_paloma_valencia":"Paloma","v_sergio_fajardo":"Fajardo",
-                         "total_validos":"Válidos","pct_abelardo":"% AE","sem_icon":"Pos."}
+                         "total_validos":"Votos totales","pct_abelardo":"% ADLE","sem_icon":"Pos."}
 
             def _av_fmt(df_in):
                 df_o = df_in[_av_rcols].rename(columns=_av_rren).reset_index(drop=True).copy()
-                df_o["% AE"] = df_o["% AE"].apply(lambda v: f"{v:.1f}%")
-                for _c in ["Abelardo","Cepeda","Paloma","Fajardo","Válidos"]:
+                df_o["% ADLE"] = df_o["% ADLE"].apply(lambda v: f"{v:.1f}%")
+                for _c in ["Abelardo","Cepeda","Paloma","Fajardo","Votos totales"]:
                     df_o[_c] = df_o[_c].apply(lambda v: f"{int(v):,}")
                 return df_o
 
@@ -5068,12 +5068,12 @@ with t_amva:
     _av_tbl = _av_muni_sum[["municipio","puestos","mesas","total_val",
                               "pct_ae","pct_ic","pct_paloma","pct_fajardo","pot_ambos"]].rename(columns={
         "municipio":"Municipio","puestos":"Puestos","mesas":"Mesas",
-        "total_val":"Válidos","pct_ae":"% AE","pct_ic":"% IC",
-        "pct_paloma":"% Paloma","pct_fajardo":"% Fajardo","pot_ambos":"AE+Ambos",
+        "total_val":"Votos totales","pct_ae":"% ADLE","pct_ic":"% IC",
+        "pct_paloma":"% Paloma","pct_fajardo":"% Fajardo","pot_ambos":"ADLE+Ambos",
     }).reset_index(drop=True)
-    for _c in ["% AE","% IC","% Paloma","% Fajardo","AE+Ambos"]:
+    for _c in ["% ADLE","% IC","% Paloma","% Fajardo","ADLE+Ambos"]:
         _av_tbl[_c] = _av_tbl[_c].apply(lambda v: f"{v:.1f}%")
-    _av_tbl["Válidos"] = _av_tbl["Válidos"].apply(lambda v: f"{int(v):,}")
+    _av_tbl["Votos totales"] = _av_tbl["Votos totales"].apply(lambda v: f"{int(v):,}")
     _av_tbl["Mesas"]   = _av_tbl["Mesas"].apply(lambda v: f"{int(v):,}")
     st.dataframe(_av_tbl, use_container_width=True, hide_index=True)
 
@@ -5132,14 +5132,14 @@ with t_amva:
                 "dif_ic_ae","pct_paloma","pct_fajardo","pot_ambos","total_validos",
             ]].rename(columns={
                 "puesto":"Puesto","municipio":"Municipio",
-                "pct_abelardo":"% AE","pct_ic":"% IC","dif_ic_ae":"Dif IC–AE",
+                "pct_abelardo":"% ADLE","pct_ic":"% IC","dif_ic_ae":"Dif IC–AE",
                 "pct_paloma":"% Paloma","pct_fajardo":"% Fajardo",
-                "pot_ambos":"AE+Ambos","total_validos":"Válidos",
+                "pot_ambos":"ADLE+Ambos","total_validos":"Votos totales",
             }).sort_values("Dif IC–AE", ascending=False).reset_index(drop=True)
-            for _c in ["% AE","% IC","% Paloma","% Fajardo","AE+Ambos"]:
+            for _c in ["% ADLE","% IC","% Paloma","% Fajardo","ADLE+Ambos"]:
                 _avic_t[_c] = _avic_t[_c].apply(lambda v: f"{v:.1f}%")
             _avic_t["Dif IC–AE"] = _avic_t["Dif IC–AE"].apply(lambda v: f"+{v:.1f}pp")
-            _avic_t["Válidos"]   = _avic_t["Válidos"].apply(lambda v: f"{int(v):,}")
+            _avic_t["Votos totales"]   = _avic_t["Votos totales"].apply(lambda v: f"{int(v):,}")
             st.dataframe(_avic_t, use_container_width=True, hide_index=True, height=520)
             st.caption("AE+Ambos: % si Abelardo recibe el 100% de Paloma + Fajardo")
         else:
@@ -5169,7 +5169,7 @@ with t_amva:
             hovertemplate=(
                 "<b>%{y}</b> · %{customdata[4]}<br>"
                 f"{label}: <b>%{{x:.1f}}%</b><br>"
-                "AE: %{customdata[0]:.1f}% · IC: %{customdata[1]:.1f}%<br>"
+                "ADLE: %{customdata[0]:.1f}% · IC: %{customdata[1]:.1f}%<br>"
                 "AE+Ambos: %{customdata[2]:.1f}%<extra></extra>"
             ),
         ))
@@ -5197,11 +5197,11 @@ with t_amva:
         _t_avpal = _df_avpal[["puesto","municipio","pct_paloma","pct_abelardo",
                                "pct_ic","pot_ambos","total_validos"]].rename(columns={
             "puesto":"Puesto","municipio":"Municipio","pct_paloma":"% Paloma",
-            "pct_abelardo":"% AE","pct_ic":"% IC","pot_ambos":"AE+Ambos","total_validos":"Válidos"
+            "pct_abelardo":"% ADLE","pct_ic":"% IC","pot_ambos":"ADLE+Ambos","total_validos":"Votos totales"
         }).reset_index(drop=True)
-        for _c in ["% Paloma","% AE","% IC","AE+Ambos"]:
+        for _c in ["% Paloma","% ADLE","% IC","ADLE+Ambos"]:
             _t_avpal[_c] = _t_avpal[_c].apply(lambda v: f"{v:.1f}%")
-        _t_avpal["Válidos"] = _t_avpal["Válidos"].apply(lambda v: f"{int(v):,}")
+        _t_avpal["Votos totales"] = _t_avpal["Votos totales"].apply(lambda v: f"{int(v):,}")
         st.dataframe(_t_avpal, use_container_width=True, hide_index=True)
 
     with _avpf2:
@@ -5211,11 +5211,11 @@ with t_amva:
         _t_avfaj = _df_avfaj[["puesto","municipio","pct_fajardo","pct_abelardo",
                                "pct_ic","pot_ambos","total_validos"]].rename(columns={
             "puesto":"Puesto","municipio":"Municipio","pct_fajardo":"% Fajardo",
-            "pct_abelardo":"% AE","pct_ic":"% IC","pot_ambos":"AE+Ambos","total_validos":"Válidos"
+            "pct_abelardo":"% ADLE","pct_ic":"% IC","pot_ambos":"ADLE+Ambos","total_validos":"Votos totales"
         }).reset_index(drop=True)
-        for _c in ["% Fajardo","% AE","% IC","AE+Ambos"]:
+        for _c in ["% Fajardo","% ADLE","% IC","ADLE+Ambos"]:
             _t_avfaj[_c] = _t_avfaj[_c].apply(lambda v: f"{v:.1f}%")
-        _t_avfaj["Válidos"] = _t_avfaj["Válidos"].apply(lambda v: f"{int(v):,}")
+        _t_avfaj["Votos totales"] = _t_avfaj["Votos totales"].apply(lambda v: f"{int(v):,}")
         st.dataframe(_t_avfaj, use_container_width=True, hide_index=True)
 
     st.divider()
@@ -5239,7 +5239,7 @@ with t_amva:
         + "Cepeda: " + _av_coal["pct_ic"].map(lambda x: f"{x:.1f}%") + "<br>"
         + "Solo AE: " + _av_coal["pct_ae_p"].map(lambda x: f"{x:.1f}%") + "<br>"
         + "Municipio: " + _av_coal["municipio"] + "<br>"
-        + "Válidos: " + _av_coal["total_validos"].map(lambda x: f"{int(x):,}")
+        + "Votos totales: " + _av_coal["total_validos"].map(lambda x: f"{int(x):,}")
     )
     _fig_av_coal = go.Figure(go.Scattermapbox(
         lat=_av_coal["lat"], lon=_av_coal["lon"],
