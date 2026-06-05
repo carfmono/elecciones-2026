@@ -3840,99 +3840,112 @@ with t_medellin:
 
     st.divider()
 
-    # ── Mejores puestos Paloma y Fajardo ──────────────────────────────────────
-    st.subheader("Mejores puestos — Paloma Valencia y Sergio Fajardo")
+    # ── Puestos con mayor votación: Paloma y Fajardo ──────────────────────────
+    st.subheader("Puestos con mayor votación — Paloma Valencia y Sergio Fajardo")
 
     _pf_c1, _pf_c2 = st.columns(2, gap="large")
 
-    def _top_cand_bar(df_src, pct_col, label, color, n=20):
-        _df = df_src.nlargest(n, pct_col)[
-            ["puesto", "comuna_label", pct_col, "pct_abelardo",
-             "v_ivan_cepeda_pct", "pot_ambos", "total_validos"]
-        ].copy()
-        _fig = go.Figure()
-        _fig.add_trace(go.Bar(
-            y=_df["puesto"],
-            x=_df[pct_col],
-            orientation="h",
-            name=label,
-            marker_color=color,
-            text=_df[pct_col].apply(lambda v: f"{v:.1f}%"),
-            textposition="outside",
-            textfont=dict(size=9, color="#9A9A90", family="IBM Plex Mono"),
-            customdata=_df[["pct_abelardo", "v_ivan_cepeda_pct", "pot_ambos",
-                             "total_validos", "comuna_label"]].values,
-            hovertemplate=(
-                "<b>%{y}</b><br>"
-                f"{label}: <b>%{{x:.1f}}%</b><br>"
-                "AE: %{customdata[0]:.1f}% · IC: %{customdata[1]:.1f}%<br>"
-                "AE+Ambos: %{customdata[2]:.1f}%<br>"
-                "Válidos: %{customdata[3]:,} · %{customdata[4]}<extra></extra>"
-            ),
-        ))
-        _fig.add_trace(go.Bar(
-            y=_df["puesto"],
-            x=_df["pct_abelardo"],
-            orientation="h",
-            name="Abelardo",
-            marker_color="#1f77b4",
-            opacity=0.5,
-            text=None,
-            hoverinfo="skip",
-        ))
-        _fig.update_layout(
-            barmode="overlay",
-            height=max(300, n * 22),
-            margin=dict(l=0, r=65, t=10, b=0),
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="#111111",
-            xaxis=dict(range=[0, 55], ticksuffix="%",
-                       gridcolor="#1E1E1E", tickfont=dict(color="#9A9A90")),
-            yaxis=dict(gridcolor="rgba(0,0,0,0)",
-                       tickfont=dict(color="#9A9A90", size=9)),
-            legend=dict(orientation="h", yanchor="bottom", y=1.01,
-                        xanchor="left", x=0, font=dict(color="#9A9A90", size=11),
-                        bgcolor="rgba(0,0,0,0)"),
-        )
-        return _fig, _df
+    # Paloma — top 20 por votos absolutos
+    _pal_top20 = (
+        _perf_df[["puesto", "comuna_label", "v_paloma_valencia", "votos_abelardo",
+                  "v_ivan_cepeda", "total_validos"]]
+        .nlargest(20, "v_paloma_valencia")
+        .copy()
+    )
+    _pal_top20["rank"] = range(1, len(_pal_top20) + 1)
 
     with _pf_c1:
-        st.markdown("##### Paloma Valencia — top 20 puestos")
-        _fig_pal, _df_pal = _top_cand_bar(
-            _perf_df, "pct_paloma", "Paloma", "#2ca02c")
-        st.plotly_chart(_fig_pal, use_container_width=True,
+        st.markdown("##### Paloma Valencia — top 20 por votos")
+        _fig_pal2 = go.Figure(go.Bar(
+            y=_pal_top20["puesto"],
+            x=_pal_top20["v_paloma_valencia"],
+            orientation="h",
+            marker_color="#2ca02c",
+            text=_pal_top20["v_paloma_valencia"].apply(lambda v: f"{int(v):,}"),
+            textposition="outside",
+            textfont=dict(size=10, color="#9A9A90", family="IBM Plex Mono"),
+            customdata=_pal_top20[["comuna_label","votos_abelardo","v_ivan_cepeda","total_validos"]].values,
+            hovertemplate=(
+                "<b>%{y}</b> · %{customdata[0]}<br>"
+                "Paloma: <b>%{x:,} votos</b><br>"
+                "AE: %{customdata[1]:,} · IC: %{customdata[2]:,}<br>"
+                "Válidos: %{customdata[3]:,}<extra></extra>"
+            ),
+        ))
+        _fig_pal2.update_layout(
+            height=500,
+            margin=dict(l=0, r=70, t=10, b=0),
+            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#111111",
+            xaxis=dict(tickformat=",d", gridcolor="#1E1E1E",
+                       tickfont=dict(color="#9A9A90")),
+            yaxis=dict(gridcolor="rgba(0,0,0,0)", autorange="reversed",
+                       tickfont=dict(color="#9A9A90", size=9)),
+        )
+        st.plotly_chart(_fig_pal2, use_container_width=True,
                         config={"displayModeBar": False})
-        _tbl_pal = _df_pal[["puesto", "comuna_label", "pct_paloma",
-                             "pct_abelardo", "v_ivan_cepeda_pct",
-                             "pot_ambos", "total_validos"]].rename(columns={
-            "puesto": "Puesto", "comuna_label": "Comuna",
-            "pct_paloma": "% Paloma", "pct_abelardo": "% AE",
-            "v_ivan_cepeda_pct": "% IC", "pot_ambos": "AE+Ambos",
+
+        _tbl_pal2 = _pal_top20[["rank","puesto","comuna_label","v_paloma_valencia",
+                                 "votos_abelardo","v_ivan_cepeda","total_validos"]].rename(columns={
+            "rank": "#", "puesto": "Puesto", "comuna_label": "Comuna",
+            "v_paloma_valencia": "Votos Paloma",
+            "votos_abelardo": "Votos AE",
+            "v_ivan_cepeda": "Votos IC",
             "total_validos": "Válidos",
         }).reset_index(drop=True)
-        for _c in ["% Paloma", "% AE", "% IC", "AE+Ambos"]:
-            _tbl_pal[_c] = _tbl_pal[_c].apply(lambda v: f"{v:.1f}%")
-        _tbl_pal["Válidos"] = _tbl_pal["Válidos"].apply(lambda v: f"{int(v):,}")
-        st.dataframe(_tbl_pal, use_container_width=True, hide_index=True)
+        for _c in ["Votos Paloma", "Votos AE", "Votos IC", "Válidos"]:
+            _tbl_pal2[_c] = _tbl_pal2[_c].apply(lambda v: f"{int(v):,}")
+        st.dataframe(_tbl_pal2, use_container_width=True, hide_index=True)
+
+    # Fajardo — top 20 por votos absolutos
+    _faj_top20 = (
+        _perf_df[["puesto", "comuna_label", "v_sergio_fajardo", "votos_abelardo",
+                  "v_ivan_cepeda", "total_validos"]]
+        .nlargest(20, "v_sergio_fajardo")
+        .copy()
+    )
+    _faj_top20["rank"] = range(1, len(_faj_top20) + 1)
 
     with _pf_c2:
-        st.markdown("##### Sergio Fajardo — top 20 puestos")
-        _fig_faj, _df_faj = _top_cand_bar(
-            _perf_df, "pct_fajardo", "Fajardo", "#ff7f0e")
-        st.plotly_chart(_fig_faj, use_container_width=True,
+        st.markdown("##### Sergio Fajardo — top 20 por votos")
+        _fig_faj2 = go.Figure(go.Bar(
+            y=_faj_top20["puesto"],
+            x=_faj_top20["v_sergio_fajardo"],
+            orientation="h",
+            marker_color="#ff7f0e",
+            text=_faj_top20["v_sergio_fajardo"].apply(lambda v: f"{int(v):,}"),
+            textposition="outside",
+            textfont=dict(size=10, color="#9A9A90", family="IBM Plex Mono"),
+            customdata=_faj_top20[["comuna_label","votos_abelardo","v_ivan_cepeda","total_validos"]].values,
+            hovertemplate=(
+                "<b>%{y}</b> · %{customdata[0]}<br>"
+                "Fajardo: <b>%{x:,} votos</b><br>"
+                "AE: %{customdata[1]:,} · IC: %{customdata[2]:,}<br>"
+                "Válidos: %{customdata[3]:,}<extra></extra>"
+            ),
+        ))
+        _fig_faj2.update_layout(
+            height=500,
+            margin=dict(l=0, r=70, t=10, b=0),
+            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#111111",
+            xaxis=dict(tickformat=",d", gridcolor="#1E1E1E",
+                       tickfont=dict(color="#9A9A90")),
+            yaxis=dict(gridcolor="rgba(0,0,0,0)", autorange="reversed",
+                       tickfont=dict(color="#9A9A90", size=9)),
+        )
+        st.plotly_chart(_fig_faj2, use_container_width=True,
                         config={"displayModeBar": False})
-        _tbl_faj = _df_faj[["puesto", "comuna_label", "pct_fajardo",
-                             "pct_abelardo", "v_ivan_cepeda_pct",
-                             "pot_ambos", "total_validos"]].rename(columns={
-            "puesto": "Puesto", "comuna_label": "Comuna",
-            "pct_fajardo": "% Fajardo", "pct_abelardo": "% AE",
-            "v_ivan_cepeda_pct": "% IC", "pot_ambos": "AE+Ambos",
+
+        _tbl_faj2 = _faj_top20[["rank","puesto","comuna_label","v_sergio_fajardo",
+                                 "votos_abelardo","v_ivan_cepeda","total_validos"]].rename(columns={
+            "rank": "#", "puesto": "Puesto", "comuna_label": "Comuna",
+            "v_sergio_fajardo": "Votos Fajardo",
+            "votos_abelardo": "Votos AE",
+            "v_ivan_cepeda": "Votos IC",
             "total_validos": "Válidos",
         }).reset_index(drop=True)
-        for _c in ["% Fajardo", "% AE", "% IC", "AE+Ambos"]:
-            _tbl_faj[_c] = _tbl_faj[_c].apply(lambda v: f"{v:.1f}%")
-        _tbl_faj["Válidos"] = _tbl_faj["Válidos"].apply(lambda v: f"{int(v):,}")
-        st.dataframe(_tbl_faj, use_container_width=True, hide_index=True)
+        for _c in ["Votos Fajardo", "Votos AE", "Votos IC", "Válidos"]:
+            _tbl_faj2[_c] = _tbl_faj2[_c].apply(lambda v: f"{int(v):,}")
+        st.dataframe(_tbl_faj2, use_container_width=True, hide_index=True)
 
     st.divider()
 
