@@ -4472,14 +4472,14 @@ with t_medellin:
     )
     st.plotly_chart(_fig_com_all, use_container_width=True, config={"displayModeBar": False})
 
-    # ── Tabla completa todos los candidatos ───────────────────────────────────
-    _tbl_all = _com_all[["comuna_label","validos"]].copy()
-    _tbl_all.rename(columns={"comuna_label":"Comuna","validos":"Válidos"}, inplace=True)
+    # ── Tabla votos absolutos por comuna — todos los candidatos ──────────────
+    _tbl_votos = _com_all[["comuna_label","validos"]].copy()
+    _tbl_votos.rename(columns={"comuna_label":"Comuna","validos":"Válidos"}, inplace=True)
     for _col, _lbl, _ in _ALL_CANDS_MED:
-        _tbl_all[f"% {_lbl}"] = _com_all[f"pct_{_col}"].apply(lambda v: f"{v:.1f}%")
-    _tbl_all["Válidos"] = _tbl_all["Válidos"].apply(lambda v: f"{int(v):,}")
-    _tbl_all = _tbl_all.reset_index(drop=True)
-    st.dataframe(_tbl_all, use_container_width=True, hide_index=True, height=560)
+        _tbl_votos[_lbl] = _com_all[_col].apply(lambda v: f"{int(v):,}")
+    _tbl_votos["Válidos"] = _tbl_votos["Válidos"].apply(lambda v: f"{int(v):,}")
+    _tbl_votos = _tbl_votos.reset_index(drop=True)
+    st.dataframe(_tbl_votos, use_container_width=True, hide_index=True, height=560)
 
     st.divider()
 
