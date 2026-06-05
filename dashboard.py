@@ -4,6 +4,7 @@ Ejecutar: .venv/bin/streamlit run dashboard.py
 """
 
 import json
+import os
 import unicodedata
 import numpy as np
 import pandas as pd
@@ -265,6 +266,47 @@ div[data-testid="stTabsContent"] h3 {
 </style>
 <div id="page-title-bar">Análisis Electoral &ndash; Primera Vuelta Colombia 2026</div>
 """, unsafe_allow_html=True)
+
+# ── Autenticación ─────────────────────────────────────────────────────────────
+def _get_credentials():
+    try:
+        return st.secrets["auth"]["username"], st.secrets["auth"]["password"]
+    except Exception:
+        return os.environ.get("DASH_USERNAME", ""), os.environ.get("DASH_PASSWORD", "")
+
+def _login_wall():
+    _valid_user, _valid_pass = _get_credentials()
+    if not _valid_user:
+        st.error("Credenciales no configuradas.")
+        st.stop()
+    _c1, _c2, _c3 = st.columns([1, 1.4, 1])
+    with _c2:
+        st.markdown("<br><br><br>", unsafe_allow_html=True)
+        st.markdown(
+            "<p style='font-family:Georgia,serif;font-size:1.5rem;"
+            "color:#C8A96E;letter-spacing:0.06em;margin-bottom:4px'>"
+            "Análisis Electoral Colombia 2026</p>",
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            "<p style='color:#9A9A90;font-size:0.85rem;margin-bottom:28px'>"
+            "Acceso restringido — ingresa tus credenciales</p>",
+            unsafe_allow_html=True,
+        )
+        with st.form("login_form", border=False):
+            _user = st.text_input("Usuario", placeholder="usuario")
+            _pwd  = st.text_input("Contraseña", type="password", placeholder="••••••••")
+            _ok   = st.form_submit_button("Ingresar", use_container_width=True)
+            if _ok:
+                if _user == _valid_user and _pwd == _valid_pass:
+                    st.session_state["authenticated"] = True
+                    st.rerun()
+                else:
+                    st.error("Usuario o contraseña incorrectos")
+    st.stop()
+
+if not st.session_state.get("authenticated"):
+    _login_wall()
 
 # ── Constantes ────────────────────────────────────────────────────────────────
 TOP_CANDS = [
@@ -718,6 +760,11 @@ else:
 
 if sel_cand != "Todos":
     df_f = df_f[df_f["candidato_presidente"] == sel_cand]
+
+st.sidebar.divider()
+if st.sidebar.button("Cerrar sesión", use_container_width=True):
+    st.session_state["authenticated"] = False
+    st.rerun()
 
 # Etiqueta de municipio con departamento cuando hay nombres duplicados entre deptos
 _dup_munis = (
