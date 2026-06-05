@@ -3737,8 +3737,12 @@ with t_medellin:
     _perf_df["pct_fajardo"] = (
         _perf_df["v_sergio_fajardo"] / _perf_df["total_validos"] * 100
     ).round(1)
-    _perf_df["pot_ambos"] = (
-        (_perf_df["votos_abelardo"] + _perf_df["v_paloma_valencia"] + _perf_df["v_sergio_fajardo"])
+    _perf_df["pot_paloma"]  = (
+        (_perf_df["votos_abelardo"] + _perf_df["v_paloma_valencia"])
+        / _perf_df["total_validos"] * 100
+    ).round(1)
+    _perf_df["pot_fajardo"] = (
+        (_perf_df["votos_abelardo"] + _perf_df["v_sergio_fajardo"])
         / _perf_df["total_validos"] * 100
     ).round(1)
 
@@ -3804,7 +3808,8 @@ with t_medellin:
             _ic_tbl = _ic_wins[[
                 "puesto", "comuna_label", "pct_abelardo",
                 "v_ivan_cepeda_pct", "dif_ic_ae",
-                "pct_paloma", "pct_fajardo", "pot_ambos",
+                "pct_paloma", "pct_fajardo",
+                "pot_paloma", "pot_fajardo",
                 "total_validos",
             ]].rename(columns={
                 "puesto":            "Puesto",
@@ -3814,18 +3819,19 @@ with t_medellin:
                 "dif_ic_ae":         "Dif IC–AE",
                 "pct_paloma":        "% Paloma",
                 "pct_fajardo":       "% Fajardo",
-                "pot_ambos":         "AE+Ambos",
+                "pot_paloma":        "AE + Paloma",
+                "pot_fajardo":       "AE + Fajardo",
                 "total_validos":     "Válidos",
             }).sort_values("Dif IC–AE", ascending=False).reset_index(drop=True)
 
-            for _c in ["% AE", "% IC", "% Paloma", "% Fajardo", "AE+Ambos"]:
+            for _c in ["% AE", "% IC", "% Paloma", "% Fajardo", "AE + Paloma", "AE + Fajardo"]:
                 _ic_tbl[_c] = _ic_tbl[_c].apply(lambda v: f"{v:.1f}%")
             _ic_tbl["Dif IC–AE"] = _ic_tbl["Dif IC–AE"].apply(lambda v: f"+{v:.1f}pp")
             _ic_tbl["Válidos"]   = _ic_tbl["Válidos"].apply(lambda v: f"{int(v):,}")
 
             st.dataframe(_ic_tbl, use_container_width=True,
                          hide_index=True, height=540)
-            st.caption("AE+Ambos: % de Abelardo si recibe el 100% de Paloma + Fajardo")
+            st.caption("AE + Paloma / AE + Fajardo: % si Abelardo recibe el 100% de votos de ese candidato")
         else:
             st.info("Abelardo ganó en todos los puestos del filtro actual.")
 
