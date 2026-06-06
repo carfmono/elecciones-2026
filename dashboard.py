@@ -659,8 +659,8 @@ def load_medellin_data():
         80: "Corr. San Antonio de Prado",
         90: "Corr. Santa Elena",
     }
-    _p["cod_comune"]  = _p["cod_comune"].fillna(0).astype(int)
-    _m["cod_comuna"]  = _m["cod_comuna"].fillna(0).astype(int)
+    _p["cod_comune"]  = pd.to_numeric(_p["cod_comune"], errors="coerce").fillna(0).astype(int)
+    _m["cod_comuna"]  = pd.to_numeric(_m["cod_comuna"], errors="coerce").fillna(0).astype(int)
     _p["comuna_label"] = _p["cod_comune"].map(_COM_NAMES).fillna("Sin asignar")
     _m["comuna_label"] = _m["cod_comuna"].map(_COM_NAMES).fillna("Sin asignar")
     return _p, _m, _COM_NAMES, _comunas_geo
