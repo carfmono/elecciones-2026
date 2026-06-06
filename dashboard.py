@@ -2921,7 +2921,7 @@ with t_antioquia:
                     df_o = _anp_dmv2[_anp_rcols].rename(columns=_anp_rren).reset_index(drop=True)
                     df_o["% ADLE"] = df_o["% ADLE"].apply(lambda v: f"{v:.1f}%")
                     for _c in ["Abelardo","Cepeda","Paloma","Fajardo","Votos totales"]:
-                        df_o[_c] = df_o[_c].apply(lambda v: f"{int(v):,}")
+                        df_o[_c] = df_o[_c].apply(lambda v: f"{int(v):,}" if pd.notna(v) else "—")
                     return df_o
 
                 _anp_tl, _anp_tr = st.columns(2)
@@ -2971,8 +2971,8 @@ with t_antioquia:
         }).reset_index(drop=True)
         for _c in ["% ADLE","% IC","% Paloma","% Fajardo","ADLE+Ambos"]:
             _anp_tbl[_c] = _anp_tbl[_c].apply(lambda v: f"{v:.1f}%")
-        _anp_tbl["Votos totales"] = _anp_tbl["Votos totales"].apply(lambda v: f"{int(v):,}")
-        _anp_tbl["Mesas"]   = _anp_tbl["Mesas"].apply(lambda v: f"{int(v):,}")
+        _anp_tbl["Votos totales"] = _anp_tbl["Votos totales"].apply(lambda v: f"{int(v):,}" if pd.notna(v) else "—")
+        _anp_tbl["Mesas"]   = _anp_tbl["Mesas"].apply(lambda v: f"{int(v):,}" if pd.notna(v) else "—")
         st.dataframe(_anp_tbl, use_container_width=True, hide_index=True)
 
         st.divider()
@@ -3037,7 +3037,7 @@ with t_antioquia:
                 for _c in ["% ADLE","% IC","% Paloma","% Fajardo","ADLE+Ambos"]:
                     _anpic_t[_c] = _anpic_t[_c].apply(lambda v: f"{v:.1f}%")
                 _anpic_t["Dif IC–AE"] = _anpic_t["Dif IC–AE"].apply(lambda v: f"+{v:.1f}pp")
-                _anpic_t["Votos totales"]   = _anpic_t["Votos totales"].apply(lambda v: f"{int(v):,}")
+                _anpic_t["Votos totales"]   = _anpic_t["Votos totales"].apply(lambda v: f"{int(v):,}" if pd.notna(v) else "—")
                 st.dataframe(_anpic_t, use_container_width=True, hide_index=True, height=520)
                 st.caption("AE+Ambos: % si Abelardo recibe el 100% de Paloma + Fajardo")
             else:
@@ -3099,7 +3099,7 @@ with t_antioquia:
             }).reset_index(drop=True)
             for _c in ["% Paloma","% ADLE","% IC","ADLE+Ambos"]:
                 _t_anppal[_c] = _t_anppal[_c].apply(lambda v: f"{v:.1f}%")
-            _t_anppal["Votos totales"] = _t_anppal["Votos totales"].apply(lambda v: f"{int(v):,}")
+            _t_anppal["Votos totales"] = _t_anppal["Votos totales"].apply(lambda v: f"{int(v):,}" if pd.notna(v) else "—")
             st.dataframe(_t_anppal, use_container_width=True, hide_index=True)
 
         with _anppf2:
@@ -3113,7 +3113,7 @@ with t_antioquia:
             }).reset_index(drop=True)
             for _c in ["% Fajardo","% ADLE","% IC","ADLE+Ambos"]:
                 _t_anpfaj[_c] = _t_anpfaj[_c].apply(lambda v: f"{v:.1f}%")
-            _t_anpfaj["Votos totales"] = _t_anpfaj["Votos totales"].apply(lambda v: f"{int(v):,}")
+            _t_anpfaj["Votos totales"] = _t_anpfaj["Votos totales"].apply(lambda v: f"{int(v):,}" if pd.notna(v) else "—")
             st.dataframe(_t_anpfaj, use_container_width=True, hide_index=True)
 
         # ── Mapa coalición AE + Paloma + Fajardo – Antioquia ─────────────────
@@ -3741,7 +3741,7 @@ with t_medellin:
                 df_o = df_in[_rank_cols].rename(columns=_rank_rename).reset_index(drop=True).copy()
                 df_o["% ADLE"]    = df_o["% ADLE"].apply(lambda v: f"{v:.1f}%")
                 for _c in ["Abelardo", "Cepeda", "Paloma", "Fajardo", "Votos totales"]:
-                    df_o[_c] = df_o[_c].apply(lambda v: f"{int(v):,}")
+                    df_o[_c] = df_o[_c].apply(lambda v: f"{int(v):,}" if pd.notna(v) else "—")
                 return df_o
 
             with _tb_l:
@@ -3863,7 +3863,7 @@ with t_medellin:
             for _c in ["% ADLE", "% IC", "% Paloma", "% Fajardo", "ADLE + Paloma", "ADLE + Fajardo"]:
                 _ic_tbl[_c] = _ic_tbl[_c].apply(lambda v: f"{v:.1f}%")
             _ic_tbl["Dif IC–AE"] = _ic_tbl["Dif IC–AE"].apply(lambda v: f"+{v:.1f}pp")
-            _ic_tbl["Votos totales"]   = _ic_tbl["Votos totales"].apply(lambda v: f"{int(v):,}")
+            _ic_tbl["Votos totales"]   = _ic_tbl["Votos totales"].apply(lambda v: f"{int(v):,}" if pd.notna(v) else "—")
 
             st.dataframe(_ic_tbl, use_container_width=True,
                          hide_index=True, height=540)
@@ -3910,7 +3910,7 @@ with t_medellin:
         for _c in ["% ADLE", "% IC", "% Paloma", "% Fajardo"]:
             _ren_tbl[_c] = _ren_tbl[_c].apply(lambda v: f"{v:.1f}%")
         _ren_tbl["Ventaja ADLE"] = _ren_tbl["Ventaja ADLE"].apply(lambda v: f"+{v:.2f}pp")
-        _ren_tbl["Votos totales"] = _ren_tbl["Votos totales"].apply(lambda v: f"{int(v):,}")
+        _ren_tbl["Votos totales"] = _ren_tbl["Votos totales"].apply(lambda v: f"{int(v):,}" if pd.notna(v) else "—")
         st.dataframe(_ren_tbl, use_container_width=True, hide_index=True, height=530)
 
     with _ren_c2:
@@ -3988,7 +3988,7 @@ with t_medellin:
             x=_pal_top20["v_paloma_valencia"],
             orientation="h",
             marker_color="#2ca02c",
-            text=_pal_top20["v_paloma_valencia"].apply(lambda v: f"{int(v):,}"),
+            text=_pal_top20["v_paloma_valencia"].apply(lambda v: f"{int(v):,}" if pd.notna(v) else "—"),
             textposition="outside",
             textfont=dict(size=13, color="#9A9A90", family="IBM Plex Mono"),
             customdata=_pal_top20[["comuna_label","votos_abelardo","v_ivan_cepeda","total_validos"]].values,
@@ -4020,7 +4020,7 @@ with t_medellin:
             "total_validos": "Votos totales",
         }).reset_index(drop=True)
         for _c in ["Votos Paloma", "Votos ADLE", "Votos IC", "Votos totales"]:
-            _tbl_pal2[_c] = _tbl_pal2[_c].apply(lambda v: f"{int(v):,}")
+            _tbl_pal2[_c] = _tbl_pal2[_c].apply(lambda v: f"{int(v):,}" if pd.notna(v) else "—")
         st.dataframe(_tbl_pal2, use_container_width=True, hide_index=True)
 
     # Fajardo — top 20 por votos absolutos
@@ -4039,7 +4039,7 @@ with t_medellin:
             x=_faj_top20["v_sergio_fajardo"],
             orientation="h",
             marker_color="#ff7f0e",
-            text=_faj_top20["v_sergio_fajardo"].apply(lambda v: f"{int(v):,}"),
+            text=_faj_top20["v_sergio_fajardo"].apply(lambda v: f"{int(v):,}" if pd.notna(v) else "—"),
             textposition="outside",
             textfont=dict(size=13, color="#9A9A90", family="IBM Plex Mono"),
             customdata=_faj_top20[["comuna_label","votos_abelardo","v_ivan_cepeda","total_validos"]].values,
@@ -4071,7 +4071,7 @@ with t_medellin:
             "total_validos": "Votos totales",
         }).reset_index(drop=True)
         for _c in ["Votos Fajardo", "Votos ADLE", "Votos IC", "Votos totales"]:
-            _tbl_faj2[_c] = _tbl_faj2[_c].apply(lambda v: f"{int(v):,}")
+            _tbl_faj2[_c] = _tbl_faj2[_c].apply(lambda v: f"{int(v):,}" if pd.notna(v) else "—")
         st.dataframe(_tbl_faj2, use_container_width=True, hide_index=True)
 
     st.divider()
@@ -4614,8 +4614,8 @@ with t_medellin:
     _tbl_votos = _com_all[["comuna_label","validos"]].copy()
     _tbl_votos.rename(columns={"comuna_label":"Comuna","validos":"Votos totales"}, inplace=True)
     for _col, _lbl, _ in _ALL_CANDS_MED:
-        _tbl_votos[_lbl] = _com_all[_col].apply(lambda v: f"{int(v):,}")
-    _tbl_votos["Votos totales"] = _tbl_votos["Votos totales"].apply(lambda v: f"{int(v):,}")
+        _tbl_votos[_lbl] = _com_all[_col].apply(lambda v: f"{int(v):,}" if pd.notna(v) else "—")
+    _tbl_votos["Votos totales"] = _tbl_votos["Votos totales"].apply(lambda v: f"{int(v):,}" if pd.notna(v) else "—")
     _tbl_votos = _tbl_votos.reset_index(drop=True)
     st.dataframe(_tbl_votos, use_container_width=True, hide_index=True, height=560)
 
@@ -4675,10 +4675,10 @@ with t_medellin:
         "v_paloma":"Votos Paloma","pct_paloma":"% Paloma","v_fajardo":"Votos Fajardo","pct_fajardo":"% Fajardo",
     }).reset_index(drop=True)
     for _c in ["Inscritos*","Sufragantes*","Votos totales","Votos ADLE","Votos IC","Votos Paloma","Votos Fajardo"]:
-        _tbl1[_c] = _tbl1[_c].apply(lambda v: f"{int(v):,}")
+        _tbl1[_c] = _tbl1[_c].apply(lambda v: f"{int(v):,}" if pd.notna(v) else "—")
     for _c in ["% Part.*","% ADLE","% IC","% Paloma","% Fajardo"]:
         _tbl1[_c] = _tbl1[_c].apply(lambda v: f"{v:.1f}%")
-    _tbl1["Mesas"] = _tbl1["Mesas"].apply(lambda v: f"{int(v):,}")
+    _tbl1["Mesas"] = _tbl1["Mesas"].apply(lambda v: f"{int(v):,}" if pd.notna(v) else "—")
 
     st.caption(
         "* Inscritos, Sufragantes y % Part. son estimados proporcionales al número de mesas por comuna "
@@ -5061,7 +5061,7 @@ with t_amva:
                 df_o = df_in[_av_rcols].rename(columns=_av_rren).reset_index(drop=True).copy()
                 df_o["% ADLE"] = df_o["% ADLE"].apply(lambda v: f"{v:.1f}%")
                 for _c in ["Abelardo","Cepeda","Paloma","Fajardo","Votos totales"]:
-                    df_o[_c] = df_o[_c].apply(lambda v: f"{int(v):,}")
+                    df_o[_c] = df_o[_c].apply(lambda v: f"{int(v):,}" if pd.notna(v) else "—")
                 return df_o
 
             _av_tl, _av_tr = st.columns(2)
@@ -5140,8 +5140,8 @@ with t_amva:
     }).reset_index(drop=True)
     for _c in ["% ADLE","% IC","% Paloma","% Fajardo","ADLE+Ambos"]:
         _av_tbl[_c] = _av_tbl[_c].apply(lambda v: f"{v:.1f}%")
-    _av_tbl["Votos totales"] = _av_tbl["Votos totales"].apply(lambda v: f"{int(v):,}")
-    _av_tbl["Mesas"]   = _av_tbl["Mesas"].apply(lambda v: f"{int(v):,}")
+    _av_tbl["Votos totales"] = _av_tbl["Votos totales"].apply(lambda v: f"{int(v):,}" if pd.notna(v) else "—")
+    _av_tbl["Mesas"]   = _av_tbl["Mesas"].apply(lambda v: f"{int(v):,}" if pd.notna(v) else "—")
     st.dataframe(_av_tbl, use_container_width=True, hide_index=True)
 
     st.divider()
@@ -5206,7 +5206,7 @@ with t_amva:
             for _c in ["% ADLE","% IC","% Paloma","% Fajardo","ADLE+Ambos"]:
                 _avic_t[_c] = _avic_t[_c].apply(lambda v: f"{v:.1f}%")
             _avic_t["Dif IC–AE"] = _avic_t["Dif IC–AE"].apply(lambda v: f"+{v:.1f}pp")
-            _avic_t["Votos totales"]   = _avic_t["Votos totales"].apply(lambda v: f"{int(v):,}")
+            _avic_t["Votos totales"]   = _avic_t["Votos totales"].apply(lambda v: f"{int(v):,}" if pd.notna(v) else "—")
             st.dataframe(_avic_t, use_container_width=True, hide_index=True, height=520)
             st.caption("AE+Ambos: % si Abelardo recibe el 100% de Paloma + Fajardo")
         else:
@@ -5268,7 +5268,7 @@ with t_amva:
         }).reset_index(drop=True)
         for _c in ["% Paloma","% ADLE","% IC","ADLE+Ambos"]:
             _t_avpal[_c] = _t_avpal[_c].apply(lambda v: f"{v:.1f}%")
-        _t_avpal["Votos totales"] = _t_avpal["Votos totales"].apply(lambda v: f"{int(v):,}")
+        _t_avpal["Votos totales"] = _t_avpal["Votos totales"].apply(lambda v: f"{int(v):,}" if pd.notna(v) else "—")
         st.dataframe(_t_avpal, use_container_width=True, hide_index=True)
 
     with _avpf2:
@@ -5282,7 +5282,7 @@ with t_amva:
         }).reset_index(drop=True)
         for _c in ["% Fajardo","% ADLE","% IC","ADLE+Ambos"]:
             _t_avfaj[_c] = _t_avfaj[_c].apply(lambda v: f"{v:.1f}%")
-        _t_avfaj["Votos totales"] = _t_avfaj["Votos totales"].apply(lambda v: f"{int(v):,}")
+        _t_avfaj["Votos totales"] = _t_avfaj["Votos totales"].apply(lambda v: f"{int(v):,}" if pd.notna(v) else "—")
         st.dataframe(_t_avfaj, use_container_width=True, hide_index=True)
 
     st.divider()
