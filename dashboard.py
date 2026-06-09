@@ -327,8 +327,8 @@ TOP_CANDS = [
 COLORS = {
     "ABELARDO DE LA ESPRIELLA":          "#1f77b4",
     "IVÁN CEPEDA CASTRO":                "#CC0000",
-    "PALOMA VALENCIA LASERNA":           "#2ca02c",
-    "SERGIO FAJARDO VALDERRAMA":         "#ff7f0e",
+    "PALOMA VALENCIA LASERNA":           "#ff7f0e",
+    "SERGIO FAJARDO VALDERRAMA":         "#2ca02c",
     "CLAUDIA LÓPEZ":                     "#9467bd",
     "RAÚL SANTIAGO BOTERO JARAMILLO":    "#8c564b",
     "ÓSCAR MAURICIO LIZCANO ARANGO":     "#e377c2",
@@ -1044,8 +1044,8 @@ with t_nacional:
         "Fico Gutiérrez": "#1f77b4",
         "Rodolfo":        "#4a9ad4",
         "Abelardo":       "#1f77b4",
-        "Valencia":       "#2ca02c",
-        "Fajardo":        "#ff7f0e",
+        "Valencia":       "#ff7f0e",
+        "Fajardo":        "#2ca02c",
         "Otros":          "#aaaaaa",
     }
 
@@ -1074,7 +1074,7 @@ with t_nacional:
         _COLOR_BLOQUES = {
             "Izquierda":  "#CC0000",
             "Centro-der.": "#1f77b4",
-            "Centro":     "#ff7f0e",
+            "Centro":     "#2ca02c",
             "Otros":      "#aaaaaa",
         }
         fig_bloq = px.bar(
@@ -2436,7 +2436,7 @@ with t_antioquia:
             x=ant_pal["muni_nombre"],
             y=ant_pal["pct_Valencia"],
             name="% Paloma",
-            marker_color="#2ca02c",
+            marker_color="#ff7f0e",
             hovertemplate="%{x}<br>Paloma: %{y:.1f}%<extra></extra>",
         )
         fig_ant_pal.add_bar(
@@ -2592,8 +2592,8 @@ with t_antioquia:
         _ANP_CANDS_4 = {
             "v_abelardo_de_la_espriella": ("Abelardo", "#1f77b4"),
             "v_ivan_cepeda":              ("Cepeda",   "#CC0000"),
-            "v_paloma_valencia":          ("Paloma",   "#2ca02c"),
-            "v_sergio_fajardo":           ("Fajardo",  "#ff7f0e"),
+            "v_paloma_valencia":          ("Paloma",   "#ff7f0e"),
+            "v_sergio_fajardo":           ("Fajardo",  "#2ca02c"),
         }
 
         # Procesar click de mapa (run anterior)
@@ -3090,7 +3090,7 @@ with t_antioquia:
 
         with _anppf1:
             st.markdown("##### Paloma Valencia — top 20")
-            _fig_anppal, _df_anppal = _anp_top_bar(_anpperf, "pct_paloma", "Paloma", "#2ca02c")
+            _fig_anppal, _df_anppal = _anp_top_bar(_anpperf, "pct_paloma", "Paloma", "#ff7f0e")
             st.plotly_chart(_fig_anppal, use_container_width=True, config={"displayModeBar": False})
             _t_anppal = _df_anppal[["puesto","municipio","pct_paloma","pct_abelardo",
                                     "pct_ic","pot_ambos","total_validos"]].rename(columns={
@@ -3104,7 +3104,7 @@ with t_antioquia:
 
         with _anppf2:
             st.markdown("##### Sergio Fajardo — top 20")
-            _fig_anpfaj, _df_anpfaj = _anp_top_bar(_anpperf, "pct_fajardo", "Fajardo", "#ff7f0e")
+            _fig_anpfaj, _df_anpfaj = _anp_top_bar(_anpperf, "pct_fajardo", "Fajardo", "#2ca02c")
             st.plotly_chart(_fig_anpfaj, use_container_width=True, config={"displayModeBar": False})
             _t_anpfaj = _df_anpfaj[["puesto","municipio","pct_fajardo","pct_abelardo",
                                     "pct_ic","pot_ambos","total_validos"]].rename(columns={
@@ -3232,7 +3232,7 @@ with t_antioquia:
         _fig_ant_et = go.Figure()
         for _pct, _lbl, _col in [
             ("pct_ae","Abelardo","#4A90C0"), ("pct_ic","Cepeda","#CC0000"),
-            ("pct_paloma","Paloma","#4CAF50"), ("pct_fajardo","Fajardo","#FF8C00"),
+            ("pct_paloma","Paloma","#FF8C00"), ("pct_fajardo","Fajardo","#4CAF50"),
             ("pct_otros","Otros","#666666"),
         ]:
             _v = _ant_et_agg[_pct]
@@ -3264,8 +3264,8 @@ with t_medellin:
     _CANDS_4 = {
         "v_abelardo_de_la_espriella": ("Abelardo", "#1f77b4"),
         "v_ivan_cepeda":              ("Cepeda",   "#CC0000"),
-        "v_paloma_valencia":          ("Paloma",   "#2ca02c"),
-        "v_sergio_fajardo":           ("Fajardo",  "#ff7f0e"),
+        "v_paloma_valencia":          ("Paloma",   "#ff7f0e"),
+        "v_sergio_fajardo":           ("Fajardo",  "#2ca02c"),
     }
 
     # ── Procesar click del mapa (run anterior) antes de renderizar widgets ────
@@ -3987,7 +3987,7 @@ with t_medellin:
             y=_pal_top20["puesto"],
             x=_pal_top20["v_paloma_valencia"],
             orientation="h",
-            marker_color="#2ca02c",
+            marker_color="#ff7f0e",
             text=_pal_top20["v_paloma_valencia"].apply(lambda v: f"{int(v):,}" if pd.notna(v) else "—"),
             textposition="outside",
             textfont=dict(size=13, color="#9A9A90", family="IBM Plex Mono"),
@@ -4038,7 +4038,7 @@ with t_medellin:
             y=_faj_top20["puesto"],
             x=_faj_top20["v_sergio_fajardo"],
             orientation="h",
-            marker_color="#ff7f0e",
+            marker_color="#2ca02c",
             text=_faj_top20["v_sergio_fajardo"].apply(lambda v: f"{int(v):,}" if pd.notna(v) else "—"),
             textposition="outside",
             textfont=dict(size=13, color="#9A9A90", family="IBM Plex Mono"),
@@ -4150,8 +4150,8 @@ with t_medellin:
         for _col, _lbl, _clr in [
             ("pct_ae", "Abelardo", "#1f77b4"),
             ("pct_ic", "Cepeda",   "#CC0000"),
-            ("pct_paloma", "Paloma", "#2ca02c"),
-            ("pct_fajardo", "Fajardo", "#ff7f0e"),
+            ("pct_paloma", "Paloma", "#ff7f0e"),
+            ("pct_fajardo", "Fajardo", "#2ca02c"),
             ("pct_otros", "Otros", "#555555"),
         ]:
             _fig_et_stack.add_trace(go.Bar(
@@ -4183,8 +4183,8 @@ with t_medellin:
         for _col, _lbl, _clr in [
             ("pct_ae",     "Abelardo", "#1f77b4"),
             ("pct_ic",     "Cepeda",   "#CC0000"),
-            ("pct_paloma", "Paloma",   "#2ca02c"),
-            ("pct_fajardo","Fajardo",  "#ff7f0e"),
+            ("pct_paloma", "Paloma",   "#ff7f0e"),
+            ("pct_fajardo","Fajardo",  "#2ca02c"),
         ]:
             _fig_et_line.add_trace(go.Scatter(
                 x=_seg_city["segmento"],
@@ -4483,8 +4483,8 @@ with t_medellin:
     _STACK_CANDS = [
         ("pct_ae",     "Abelardo", "#4A90C0"),
         ("pct_ic",     "Cepeda",   "#CC0000"),
-        ("pct_paloma", "Paloma",   "#4CAF50"),
-        ("pct_fajardo","Fajardo",  "#FF8C00"),
+        ("pct_paloma", "Paloma",   "#FF8C00"),
+        ("pct_fajardo","Fajardo",  "#4CAF50"),
         ("pct_otros",  "Otros",    "#666666"),
     ]
 
@@ -4554,8 +4554,8 @@ with t_medellin:
     _ALL_CANDS_MED = [
         ("v_abelardo_de_la_espriella", "Abelardo",  "#4A90C0"),
         ("v_ivan_cepeda",              "Cepeda",     "#CC0000"),
-        ("v_paloma_valencia",          "Paloma",     "#4CAF50"),
-        ("v_sergio_fajardo",           "Fajardo",    "#FF8C00"),
+        ("v_paloma_valencia",          "Paloma",     "#FF8C00"),
+        ("v_sergio_fajardo",           "Fajardo",    "#4CAF50"),
         ("v_miguel_uribe_londoño",     "Uribe L.",   "#9B59B6"),
         ("v_claudia_lopez",            "C. López",   "#8E44AD"),
         ("v_gustavo_matamoros",        "Matamoros",  "#1ABC9C"),
@@ -4729,8 +4729,8 @@ with t_amva:
     _AV_CANDS_4 = {
         "v_abelardo_de_la_espriella": ("Abelardo", "#1f77b4"),
         "v_ivan_cepeda":              ("Cepeda",   "#CC0000"),
-        "v_paloma_valencia":          ("Paloma",   "#2ca02c"),
-        "v_sergio_fajardo":           ("Fajardo",  "#ff7f0e"),
+        "v_paloma_valencia":          ("Paloma",   "#ff7f0e"),
+        "v_sergio_fajardo":           ("Fajardo",  "#2ca02c"),
     }
 
     # ── Procesar click de mapa (run anterior) ─────────────────────────────────
@@ -5106,8 +5106,8 @@ with t_amva:
     for _col, _lbl, _clr in [
         ("pct_ae","Abelardo","#1f77b4"),
         ("pct_ic","Cepeda","#CC0000"),
-        ("pct_paloma","Paloma","#2ca02c"),
-        ("pct_fajardo","Fajardo","#ff7f0e"),
+        ("pct_paloma","Paloma","#ff7f0e"),
+        ("pct_fajardo","Fajardo","#2ca02c"),
     ]:
         _fig_avmuni.add_trace(go.Bar(
             name=_lbl,
@@ -5259,7 +5259,7 @@ with t_amva:
 
     with _avpf1:
         st.markdown("##### Paloma Valencia — top 20")
-        _fig_avpal, _df_avpal = _av_top_bar(_avperf, "pct_paloma", "Paloma", "#2ca02c")
+        _fig_avpal, _df_avpal = _av_top_bar(_avperf, "pct_paloma", "Paloma", "#ff7f0e")
         st.plotly_chart(_fig_avpal, use_container_width=True, config={"displayModeBar": False})
         _t_avpal = _df_avpal[["puesto","municipio","pct_paloma","pct_abelardo",
                                "pct_ic","pot_ambos","total_validos"]].rename(columns={
@@ -5273,7 +5273,7 @@ with t_amva:
 
     with _avpf2:
         st.markdown("##### Sergio Fajardo — top 20")
-        _fig_avfaj, _df_avfaj = _av_top_bar(_avperf, "pct_fajardo", "Fajardo", "#ff7f0e")
+        _fig_avfaj, _df_avfaj = _av_top_bar(_avperf, "pct_fajardo", "Fajardo", "#2ca02c")
         st.plotly_chart(_fig_avfaj, use_container_width=True, config={"displayModeBar": False})
         _t_avfaj = _df_avfaj[["puesto","municipio","pct_fajardo","pct_abelardo",
                                "pct_ic","pot_ambos","total_validos"]].rename(columns={
@@ -5402,7 +5402,7 @@ with t_amva:
     _fig_av_et = go.Figure()
     for _pct, _lbl, _col in [
         ("pct_ae","Abelardo","#4A90C0"), ("pct_ic","Cepeda","#CC0000"),
-        ("pct_paloma","Paloma","#4CAF50"), ("pct_fajardo","Fajardo","#FF8C00"),
+        ("pct_paloma","Paloma","#FF8C00"), ("pct_fajardo","Fajardo","#4CAF50"),
         ("pct_otros","Otros","#666666"),
     ]:
         _v = _av_et_agg[_pct]
